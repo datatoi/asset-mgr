@@ -16,7 +16,9 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
-export const storage = getStorage(app)
+// Points at the explicit EU bucket (dressmanager-540ba-eu), not the project's
+// registered default bucket alias, which resolves to a US-region bucket.
+export const storage = getStorage(app, `gs://${firebaseConfig.storageBucket}`)
 export const functions = getFunctions(app)
 
 if (import.meta.env.VITE_USE_EMULATORS === 'true') {

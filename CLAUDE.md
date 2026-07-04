@@ -78,6 +78,11 @@ Catalog hierarchy: **Class → Type → Item**, plus **Kit** (checkout unit).
 Both are **people**. `ownerId` = long-term assigned person; `holderId` = who
 physically has it right now. **History tracks holder changes** (`holderHistory`).
 
+`holderId` uses the sentinel value **`"storage"`** to mean "not currently
+checked out / available" (rather than null or a separate `available` boolean).
+Kit fulfillment and dashboards filter on `holderId == "storage"` to find
+available items.
+
 ## Key workflows
 - **Onboarding**: Google login → create Subscription (owner) → create Group(s) →
   build catalog (classes → types → items, with photos + NFC tags) → invite members.
@@ -97,5 +102,10 @@ physically has it right now. **History tracks holder changes** (`holderHistory`)
   writes for these, even during early iteration.
 
 ## Status
-Greenfield — nothing scaffolded yet. See [todo.md](todo.md) for the build plan.
-Original brief preserved in [agents.md](agents.md) (pre-revision; superseded here).
+Core web app scaffolded and functional (Firebase project, auth, subscription
+onboarding, catalog CRUD, dashboard, item detail with comments/history,
+kit/item requests, request inbox, member/role management, security rules).
+Mobile NFC scanner not started (draft-only reference in `mobile/App.tsx`, has
+known issues — see [mobile/README.md](mobile/README.md)). See [todo.md](todo.md)
+for what's left. Original brief preserved in [agents.md](agents.md) (pre-revision;
+superseded here).

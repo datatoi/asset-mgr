@@ -71,43 +71,56 @@ asset-mgr/
 │   ├── .env.example             Template for .env
 │   └── src/
 │       ├── main.tsx             App entry: AntD ConfigProvider, Router, AuthProvider
-│       ├── App.tsx               Route definitions
+│       ├── App.tsx               Route defs + sidebar nav (role-aware menu)
 │       ├── index.css              Global reset
 │       ├── lib/
-│       │   └── firebase.ts        Firebase app/auth/db/storage init (+ emulator wiring)
+│       │   └── firebase.ts        app/auth/db/storage/functions init + emulator wiring
 │       ├── auth/
-│       │   ├── AuthContext.tsx     onAuthStateChanged + Google sign-in/out
-│       │   └── ProtectedRoute.tsx   Route guard, redirects to /login
+│       │   ├── AuthContext.tsx     onAuthStateChanged + Firestore user profile sync
+│       │   └── ProtectedRoute.tsx   Route guard: /login if signed out, /register if no profile
+│       ├── components/
+│       │   └── ImageUpload.tsx      Shared AntD Upload → Cloud Storage widget
 │       ├── pages/
-│       │   ├── Login.tsx            "Login with Google" page
-│       │   └── Dashboard.tsx         Placeholder authenticated landing page
+│       │   ├── Login.tsx            "Login with Google"
+│       │   ├── RegisterPage.tsx      Creates Subscription + first Group + owner user doc
+│       │   ├── Dashboard.tsx         Item grid, filter by class/type/search
+│       │   ├── ClassesPage.tsx       Class CRUD (admin)
+│       │   ├── TypesPage.tsx         Type CRUD + image (admin)
+│       │   ├── ItemsPage.tsx         Item CRUD + image + rfidTag (admin)
+│       │   ├── ItemDetail.tsx        Item view: Comments tab, Holder History tab, request button
+│       │   ├── KitsPage.tsx          Kit CRUD (admin) + "Request Kit" (user, calls requestKit)
+│       │   ├── RequestInbox.tsx      Approve (calls transferItem) / decline pending requests
+│       │   ├── MembersPage.tsx       Per-group role assignment (calls assignRole)
+│       │   └── ProfilePage.tsx       Edit own size/gender/avatar
 │       └── assets/                   Static assets
 │
-├── mobile/                     NFC scanner app — placeholder (Phase 6)
-│   └── README.md                Notes: React Native, native build required
+├── mobile/                     NFC scanner — draft only, not a scaffolded project yet
+│   ├── README.md                 Notes + known issues in App.tsx (see file)
+│   └── App.tsx                    Draft scan → lookup → display component (Phase 6)
 │
 └── functions/                  Cloud Functions 2.0 (Node.js + TypeScript)
     ├── package.json
     ├── tsconfig.json
     └── src/
-        └── index.ts             Function exports (empty scaffold so far)
+        └── index.ts             transferItem, requestKit, assignRole (all onCall)
 ```
 
 ### Where things will grow
 
-As features land (see [todo.md](todo.md) phases 2–5), expect:
+Landed so far (see [todo.md](todo.md) for exact phase status): subscription
+onboarding, full catalog CRUD, dashboard browsing, item detail with
+comments/history, kit and item requests, request inbox, member/role management,
+Firestore + Storage security rules. Still ahead:
 
-- `web/src/pages/` to gain: catalog management screens (classes/types/items/kits),
-  item detail (with Comments/History tabs), user profile, member/role management,
-  the transfer/request inbox.
-- `web/src/components/` (new) for shared pieces: image upload widget, filters,
-  role-gated UI wrappers.
-- `functions/src/` to split into one file per concern, e.g. `requests.ts`
-  (kit auto-fulfillment, approve/decline), `transfers.ts` (admin direct transfer),
-  `roles.ts` (role assignment), `subscriptions.ts` (onboarding), re-exported from
-  `index.ts`.
-- `mobile/` to become a real Expo/React Native app once Phase 6 starts, mirroring
-  `web/src/lib/firebase.ts` and `web/src/auth/` patterns adapted for RN.
+- Composite Firestore indexes once filtering moves server-side (Dashboard
+  currently fetches per-subscription and filters client-side).
+- An admin "direct transfer" UI — `transferItem` supports `transferType: 'admin'`
+  today but no screen calls it outside the request-approval flow.
+- `functions/src/` splitting into one file per concern as it grows, re-exported
+  from `index.ts`.
+- `mobile/` becoming a real Expo/React Native project (Phase 6), fixing the
+  known issues in `mobile/App.tsx` and mirroring `web/src/lib/firebase.ts` /
+  `web/src/auth/` patterns adapted for RN.
 
 ## Conventions
 - One Firebase project per environment; currently a single project

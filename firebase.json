@@ -6,6 +6,7 @@
     "indexes": "firestore.indexes.json"
   },
   "storage": {
+    "bucket": "dressmanager-540ba-eu",
     "rules": "storage.rules"
   },
   "hosting": {
