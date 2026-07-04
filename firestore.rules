@@ -1,0 +1,94 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helpers
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function belongsToSub(resourceData) {
+      return resourceData.subscriptionId == getUserData().subscriptionId;
+    }
+
+    function hasRole(groupId, roles) {
+      let userGroups = getUserData().groups;
+      return userGroups.get(groupId, 'none') in roles;
+    }
+
+    function isAnyAdmin() {
+      let userGroups = getUserData().groups;
+      return userGroups.values().hasAny(['admin', 'superadmin']);
+    }
+
+    // Collections
+    
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || belongsToSub(resource.data));
+      // Clients can update their own profile EXCEPT roles (groups map)
+      allow update: if isAuthenticated() && request.auth.uid == userId 
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['groups', 'subscriptionId']);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /subscriptions/{subId} {
+      allow read: if isAuthenticated() && (resource.data.ownerUserId == request.auth.uid || getUserData().subscriptionId == subId);
+      allow write: if false; // Managed by Cloud Functions or initial setup
+    }
+
+    match /groups/{groupId} {
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && hasRole(groupId, ['superadmin']);
+    }
+
+    match /classes/{id} {
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && isAnyAdmin();
+    }
+
+    match /types/{id} {
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && isAnyAdmin();
+    }
+
+    match /items/{itemId} {
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      // Clients can write items EXCEPT holderId (privileged field)
+      allow write: if isAuthenticated() && isAnyAdmin() 
+                   && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['holderId', 'subscriptionId']));
+      
+      match /comments/{commentId} {
+        allow read: if isAuthenticated() && belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data);
+        allow create: if isAuthenticated();
+      }
+
+      match /holderHistory/{historyId} {
+        allow read: if isAuthenticated() && belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data);
+        allow write: if false; // Managed by Cloud Functions
+      }
+    }
+
+    match /kits/{kitId} {
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && isAnyAdmin();
+    }
+
+    match /requests/{reqId} {
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      // Users can create requests. Only Cloud Functions or holders can update status (via Function)
+      // Actually, RequestInbox.tsx tries to decline via updateDoc.
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        // Requester can cancel (decline) their own request?
+        request.auth.uid == resource.data.requestedByUserId ||
+        // Current holder or admin can decline (transfers must go through function)
+        request.auth.uid == resource.data.currentHolderId ||
+        isAnyAdmin()
+      ) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['itemId', 'requestedByUserId', 'subscriptionId']);
+    }
+  }
+}
