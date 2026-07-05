@@ -4,15 +4,16 @@ import { doc, onSnapshot, collection, query, orderBy, addDoc, serverTimestamp } 
 import { db } from '../lib/firebase';
 import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message } from 'antd';
 import { useAuth } from '../auth/AuthContext';
+import type { HolderHistoryEntry, Item, ItemComment } from '../types/models';
 
 const { Title, Text } = Typography;
 
 const ItemDetail: React.FC = () => {
   const { id } = useParams();
   const { user, userData } = useAuth();
-  const [item, setItem] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+  const [item, setItem] = useState<Item | null>(null);
+  const [comments, setComments] = useState<ItemComment[]>([]);
+  const [history, setHistory] = useState<HolderHistoryEntry[]>([]);
   const [newComment, setNewComment] = useState('');
   const [requesting, setRequesting] = useState(false);
 
@@ -20,13 +21,13 @@ const ItemDetail: React.FC = () => {
 
   useEffect(() => {
     if (!id) return;
-    const unsubItem = onSnapshot(doc(db, 'items', id), (snap) => setItem({ id: snap.id, ...snap.data() }));
-    
+    const unsubItem = onSnapshot(doc(db, 'items', id), (snap) => setItem({ id: snap.id, ...snap.data() } as Item));
+
     const qComments = query(collection(db, 'items', id, 'comments'), orderBy('timestamp', 'desc'));
-    const unsubComments = onSnapshot(qComments, (snap) => setComments(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubComments = onSnapshot(qComments, (snap) => setComments(snap.docs.map(d => ({ id: d.id, ...d.data() } as ItemComment))));
 
     const qHistory = query(collection(db, 'items', id, 'holderHistory'), orderBy('transferDate', 'desc'));
-    const unsubHistory = onSnapshot(qHistory, (snap) => setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubHistory = onSnapshot(qHistory, (snap) => setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as HolderHistoryEntry))));
 
     return () => { unsubItem(); unsubComments(); unsubHistory(); };
   }, [id]);
@@ -44,7 +45,7 @@ const ItemDetail: React.FC = () => {
   };
 
   const handleRequest = async () => {
-    if (!id || !user || !userData) return;
+    if (!id || !user || !userData || !item) return;
     setRequesting(true);
     try {
       await addDoc(collection(db, 'requests'), {
@@ -67,7 +68,7 @@ const ItemDetail: React.FC = () => {
   if (!item) return null;
 
   const historyColumns = [
-    { title: 'Date', dataIndex: 'transferDate', render: (d: any) => d?.toDate().toLocaleString() },
+    { title: 'Date', dataIndex: 'transferDate', render: (d: HolderHistoryEntry['transferDate']) => d?.toDate().toLocaleString() },
     { title: 'From', dataIndex: 'previousHolderId' },
     { title: 'To', dataIndex: 'newHolderId' },
     { title: 'Type', dataIndex: 'transferType', render: (t: string) => <Tag>{t.toUpperCase()}</Tag> }
@@ -84,10 +85,10 @@ const ItemDetail: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Title level={2}>Item Details</Title>
               {!isAdmin && item.holderId !== user?.uid && (
-                <Button 
-                  type="primary" 
-                  size="large" 
-                  onClick={handleRequest} 
+                <Button
+                  type="primary"
+                  size="large"
+                  onClick={handleRequest}
                   loading={requesting}
                   disabled={item.holderId === user?.uid}
                 >
@@ -124,15 +125,15 @@ const ItemDetail: React.FC = () => {
                       </div>
                       <List
                         dataSource={comments}
-                        renderItem={item => (
+                        renderItem={comment => (
                           <List.Item>
                             <List.Item.Meta
-                              avatar={<Avatar src={item.avatarUrl} />}
-                              title={item.userName}
-                              description={item.text}
+                              avatar={<Avatar src={comment.avatarUrl} />}
+                              title={comment.userName}
+                              description={comment.text}
                             />
                             <Text type="secondary" style={{ fontSize: '12px' }}>
-                              {item.timestamp?.toDate().toLocaleDateString()}
+                              {comment.timestamp?.toDate().toLocaleDateString()}
                             </Text>
                           </List.Item>
                         )}

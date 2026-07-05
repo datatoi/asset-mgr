@@ -4,6 +4,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
+import type { UserProfile } from '../types/models';
 
 const { Title } = Typography;
 
@@ -17,7 +18,7 @@ const ProfilePage: React.FC = () => {
     }
   }, [userData, form]);
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: Pick<UserProfile, 'name' | 'avatarUrl' | 'size' | 'gender'>) => {
     if (!user) return;
     try {
       const userRef = doc(db, 'users', user.uid);

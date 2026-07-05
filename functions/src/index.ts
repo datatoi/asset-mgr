@@ -1,10 +1,88 @@
+import {setGlobalOptions} from "firebase-functions/v2";
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
 
+// Keep functions colocated with Firestore (eur3) and Storage (europe-west1)
+// to avoid unnecessary cross-region latency and keep data in the EU.
+setGlobalOptions({region: "europe-west1"});
+
 const db = admin.firestore();
+
+/**
+ * Site-wide operator check - separate from the per-group 'superadmin' role.
+ * Mirrors the isPlatformAdmin() rule in firestore.rules; enforcement here is
+ * independent of anything the client claims (the client's "impersonation" of
+ * a subscription is purely a UI illusion - this is the real check).
+ * @param {string} uid Firebase Auth UID to check.
+ * @return {Promise<boolean>} Whether the UID is a granted platform admin.
+ */
+async function isPlatformAdmin(uid: string): Promise<boolean> {
+  const doc = await db.collection("platformAdmins").doc(uid).get();
+  return doc.exists;
+}
+
+/**
+ * Bootstraps a new Subscription + first Group for the caller, and makes them
+ * superadmin of that group. Firestore rules deliberately block direct client
+ * writes to `subscriptions` and `groups` (you can't create a group unless
+ * you're already superadmin of it), so this one-time setup must go through
+ * the Admin SDK. Rejects if the caller already belongs to a subscription.
+ */
+export const registerSubscription = onCall(async (request) => {
+  const {auth} = request;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
+  }
+
+  const {orgName, groupName} = request.data;
+  if (!orgName || !groupName) {
+    throw new HttpsError("invalid-argument", "Missing orgName or groupName.");
+  }
+
+  const userRef = db.collection("users").doc(auth.uid);
+  const existingUser = await userRef.get();
+  if (existingUser.exists && existingUser.data()?.subscriptionId) {
+    throw new HttpsError(
+      "already-exists",
+      "This account already belongs to a subscription."
+    );
+  }
+
+  const subRef = db.collection("subscriptions").doc();
+  const groupRef = db.collection("groups").doc();
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  const batch = db.batch();
+  batch.set(subRef, {
+    name: orgName,
+    ownerUserId: auth.uid,
+    createdAt: now,
+  });
+  batch.set(groupRef, {
+    subscriptionId: subRef.id,
+    name: groupName,
+    description: "Default group",
+    createdAt: now,
+  });
+  batch.set(userRef, {
+    subscriptionId: subRef.id,
+    name: auth.token.name || "Anonymous",
+    email: auth.token.email,
+    avatarUrl: auth.token.picture || null,
+    groups: {[groupRef.id]: "superadmin"},
+    createdAt: now,
+  }, {merge: true});
+
+  await batch.commit();
+  logger.info(
+    `Subscription ${subRef.id} + group ${groupRef.id} created by ${auth.uid}`
+  );
+
+  return {subscriptionId: subRef.id, groupId: groupRef.id};
+});
 
 /**
  * Transfers an item to a new holder. Callable by the current holder (self
@@ -38,7 +116,9 @@ export const transferItem = onCall(async (request) => {
   const userRole = userData?.groups?.[groupId];
   const isAdmin = userRole === "admin" || userRole === "superadmin";
 
-  if (!isAdmin && currentHolderId !== auth.uid) {
+  const canTransfer = isAdmin || currentHolderId === auth.uid ||
+    (await isPlatformAdmin(auth.uid));
+  if (!canTransfer) {
     throw new HttpsError(
       "permission-denied",
       "Only the current holder or an admin can transfer this item."
@@ -81,7 +161,7 @@ export const transferItem = onCall(async (request) => {
 });
 
 /**
- * Automatically picks one available item per required class for a kit and
+ * Automatically picks one available item per required type for a kit and
  * creates a pending request for each, matching the requester's size/gender.
  * "storage" is the sentinel holderId meaning "not currently checked out."
  */
@@ -98,7 +178,7 @@ export const requestKit = onCall(async (request) => {
 
   const userDoc = await db.collection("users").doc(auth.uid).get();
   const userData = userDoc.data();
-  if (!userData) {
+  if (!userData && !(await isPlatformAdmin(auth.uid))) {
     throw new HttpsError("not-found", "User data not found.");
   }
 
@@ -108,33 +188,17 @@ export const requestKit = onCall(async (request) => {
   }
 
   const kitData = kitDoc.data()!;
-  const {classIds, subscriptionId, groupId} = kitData;
-  const userSize = userData.size;
-  const userGender = userData.gender;
+  const {typeIds, subscriptionId, groupId} = kitData;
+  const userSize = userData?.size;
+  const userGender = userData?.gender;
 
   const batch = db.batch();
   const requestsCreated: string[] = [];
 
-  for (const classId of classIds) {
-    // Items don't carry classId directly (only typeId), so resolve the set of
-    // types belonging to this class first, then find an available item of one
-    // of those types matching the requester's size and gender.
-    const typesInClass = await db.collection("types")
-      .where("subscriptionId", "==", subscriptionId)
-      .where("classId", "==", classId)
-      .get();
-
-    const typeIds = typesInClass.docs.map((d) => d.id);
-    if (typeIds.length === 0) {
-      throw new HttpsError(
-        "failed-precondition",
-        `No types found for class ${classId}`
-      );
-    }
-
+  for (const typeId of typeIds) {
     const itemsQuery = await db.collection("items")
       .where("subscriptionId", "==", subscriptionId)
-      .where("typeId", "in", typeIds)
+      .where("typeId", "==", typeId)
       .where("holderId", "==", "storage")
       .where("size", "==", userSize)
       .where("gender", "==", userGender)
@@ -144,7 +208,7 @@ export const requestKit = onCall(async (request) => {
     if (!availableItem) {
       throw new HttpsError(
         "failed-precondition",
-        `No available item for class ${classId} in size ${userSize}`
+        `No available item for type ${typeId} in size ${userSize}`
       );
     }
 
@@ -190,7 +254,7 @@ export const assignRole = onCall(async (request) => {
   const callerData = callerDoc.data();
   const callerRole = callerData?.groups?.[groupId];
 
-  if (callerRole !== "superadmin") {
+  if (callerRole !== "superadmin" && !(await isPlatformAdmin(auth.uid))) {
     throw new HttpsError(
       "permission-denied",
       "Only superadmins can manage roles."

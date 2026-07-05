@@ -43,6 +43,12 @@ Two client surfaces share one Firebase backend and one Firestore data model.
   fields directly, enforced by `firestore.rules`.
 - Both clients authenticate with the same Firebase Auth (Google Sign-in) so every
   action — including an NFC scan — is attributed to a real user.
+- A **Platform Admin** layer sits above all subscriptions (this is a SaaS
+  product): one site-wide operator, granted via a `platformAdmins/{uid}`
+  allowlist doc, can list/edit any subscription, fully impersonate one via
+  "Manage as," manage pricing plans, and view site-wide metrics. Enforced
+  server-side in both `firestore.rules` and the Cloud Functions — see
+  [CLAUDE.md#platform-administration-saas-operator-layer](CLAUDE.md).
 
 See [CLAUDE.md](CLAUDE.md) for the full Firestore collection schema and
 [CLAUDE.md#key-workflows](CLAUDE.md) for how a kit request/approval flows through
@@ -75,6 +81,11 @@ asset-mgr/
 │       ├── index.css              Global reset
 │       ├── lib/
 │       │   └── firebase.ts        app/auth/db/storage/functions init + emulator wiring
+│       ├── types/
+│       │   └── models.ts           TypeScript interfaces for every Firestore document
+│       │                            shape (Item, Subscription, Kit, UserProfile, etc.) -
+│       │                            the entire "data model" layer; pages import these
+│       │                            instead of using `any` for Firestore data
 │       ├── auth/
 │       │   ├── AuthContext.tsx     onAuthStateChanged + Firestore user profile sync
 │       │   └── ProtectedRoute.tsx   Route guard: /login if signed out, /register if no profile
@@ -82,7 +93,7 @@ asset-mgr/
 │       │   └── ImageUpload.tsx      Shared AntD Upload → Cloud Storage widget
 │       ├── pages/
 │       │   ├── Login.tsx            "Login with Google"
-│       │   ├── RegisterPage.tsx      Creates Subscription + first Group + owner user doc
+│       │   ├── RegisterPage.tsx      Calls registerSubscription (Subscription+Group+owner)
 │       │   ├── Dashboard.tsx         Item grid, filter by class/type/search
 │       │   ├── ClassesPage.tsx       Class CRUD (admin)
 │       │   ├── TypesPage.tsx         Type CRUD + image (admin)
@@ -91,7 +102,10 @@ asset-mgr/
 │       │   ├── KitsPage.tsx          Kit CRUD (admin) + "Request Kit" (user, calls requestKit)
 │       │   ├── RequestInbox.tsx      Approve (calls transferItem) / decline pending requests
 │       │   ├── MembersPage.tsx       Per-group role assignment (calls assignRole)
-│       │   └── ProfilePage.tsx       Edit own size/gender/avatar
+│       │   ├── ProfilePage.tsx       Edit own size/gender/avatar
+│       │   ├── PlatformAdminPage.tsx  All subscriptions: edit metadata, "Manage as" impersonation
+│       │   ├── PlansPage.tsx          Pricing/limit plan CRUD (Platform Admin only)
+│       │   └── MetricsPage.tsx        Site-wide aggregate counts (Platform Admin only)
 │       └── assets/                   Static assets
 │
 ├── mobile/                     NFC scanner — draft only, not a scaffolded project yet
@@ -102,7 +116,8 @@ asset-mgr/
     ├── package.json
     ├── tsconfig.json
     └── src/
-        └── index.ts             transferItem, requestKit, assignRole (all onCall)
+        └── index.ts             registerSubscription, transferItem, requestKit,
+                                   assignRole (all onCall; region europe-west1)
 ```
 
 ### Where things will grow

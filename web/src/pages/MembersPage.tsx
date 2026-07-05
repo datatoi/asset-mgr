@@ -4,13 +4,14 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
+import type { Group, Role, UserProfile } from '../types/models';
 
 const { Title } = Typography;
 
 const MembersPage: React.FC = () => {
   const { userData } = useAuth();
-  const [members, setMembers] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [members, setMembers] = useState<UserProfile[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -19,26 +20,26 @@ const MembersPage: React.FC = () => {
     // Fetch all users in this subscription
     const qUsers = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubUsers = onSnapshot(qUsers, (snap) => {
-      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
     });
 
     // Fetch all groups in this subscription
     const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubGroups = onSnapshot(qGroups, (snap) => {
-      setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() } as Group)));
     });
 
     return () => { unsubUsers(); unsubGroups(); };
   }, [userData]);
 
-  const handleRoleChange = async (targetUid: string, groupId: string, role: string | null) => {
+  const handleRoleChange = async (targetUid: string, groupId: string, role: Role | null) => {
     setLoading(true);
     try {
       const assignRoleFn = httpsCallable(functions, 'assignRole');
       await assignRoleFn({ targetUid, groupId, role });
       message.success('Role updated successfully');
-    } catch (err: any) {
-      message.error('Failed to update role: ' + err.message);
+    } catch (err) {
+      message.error('Failed to update role: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setLoading(false);
     }
@@ -47,10 +48,10 @@ const MembersPage: React.FC = () => {
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name' },
     { title: 'Email', dataIndex: 'email', key: 'email' },
-    { 
-      title: 'Roles', 
+    {
+      title: 'Roles',
       key: 'roles',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: UserProfile) => (
         <Space direction="vertical" style={{ width: '100%' }}>
           {groups.map(group => {
             const currentRole = record.groups?.[group.id];

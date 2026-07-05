@@ -8,14 +8,16 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 - [x] Create Firebase project (`dressmanager-540ba`) — Firestore, Functions,
       Storage, Hosting configured; web app registered
 - [x] Enable Google Sign-in provider — confirmed enabled
-- [x] Provision Storage bucket — done via `dressmanager-540ba-eu`
-      (europe-west1), created manually and linked to Firebase because the
-      auto-provisioned free-tier bucket is fixed to `us-east1` with no EU
-      option on the free plan. Billing (Blaze) was already enabled on the
-      project, so no plan upgrade was actually needed. App points at this
-      bucket explicitly via `getStorage(app, 'gs://dressmanager-540ba-eu')`
-      since the project's registered default bucket alias still resolves
-      to a US bucket.
+- [x] Provision Storage bucket — the console's free-tier "Get started" flow
+      auto-provisions a fixed `us-east1` bucket with no EU option. Fixed
+      properly (not just worked around) by calling the Firebase Storage API's
+      `defaultBucket:create` directly with `location: europe-west1` — the
+      same call the console button makes — which created the project's real
+      default bucket `dressmanager-540ba.firebasestorage.app` in
+      `EUROPE-WEST1`. (Billing/Blaze was already enabled on the project, so
+      no plan upgrade was actually needed.) An earlier workaround bucket
+      created via manual `addFirebase` linking was deleted once this proper
+      fix was in place — `web/src/lib/firebase.ts` uses plain `getStorage(app)`.
 - [x] Init repo structure: `web/`, `mobile/`, `functions/`, `firestore.rules`,
       `storage.rules`, `firestore.indexes.json`, `firebase.json`
 - [x] Configure Firebase emulator suite for local dev (auth/firestore/storage/
@@ -37,13 +39,24 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       already have signed in once to appear
 - [x] Cloud Function: role assignment/revocation (superadmin-only, per group)
       — `assignRole`
+- [x] Fixed a real bug: `RegisterPage` originally wrote the Subscription/Group/
+      user docs directly from the client, but `firestore.rules` correctly
+      blocks that (`subscriptions: allow write: if false`, and `groups` write
+      requires already being superadmin of the group you're trying to
+      create — impossible on first creation). Added the `registerSubscription`
+      Cloud Function (Admin SDK, bypasses rules) to do this atomically instead;
+      `RegisterPage` now just calls it.
 
 ## Phase 2 — Catalog management (web)
 - [x] Classes CRUD (e.g. dress, shoes, trousers, shirt, boots)
 - [x] Types CRUD (variant + gender + **image upload** to Cloud Storage)
 - [x] Items CRUD (type, size, gender, condition, **image**, **rfidTag**,
       owner, holder) — holder defaults to sentinel `"storage"` on creation
-- [x] Kits CRUD (name, gender, size, required `classIds`, description)
+- [x] Kits CRUD (name, gender, size, required `typeIds`, description) —
+      originally built (and documented) as `classIds`, corrected to reference
+      specific Types instead of broad Classes (a kit needs "Red Dress", not
+      just any "Dress"); also simplified `requestKit` by removing the
+      now-unneeded classId→typeIds resolution step
 - [x] Image upload/preview component (reused for types, items, avatars)
 
 ## Phase 3 — Browsing & detail (web)
@@ -58,8 +71,8 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 
 ## Phase 4 — Requests & transfers
 - [x] "Request kit" button → Cloud Function (`requestKit`) auto-picks
-      available items by size/gender per required class; fails with
-      `failed-precondition` if a class has none available
+      available items by size/gender per required type; fails with
+      `failed-precondition` if a type has none available
 - [x] "Request item" flow (single item, from `ItemDetail`)
 - [x] Request inbox: approve / decline (holder or admin) — approve calls
       `transferItem`, decline is a direct client update restricted by rules
@@ -87,7 +100,8 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 - [x] Verify rules against emulator — confirmed both rule files parse and the
       emulator suite boots cleanly; no scripted rules *unit tests* yet (e.g.
       `@firebase/rules-unit-testing`), just structural validation
-- [ ] Deploy rules to the live project (currently local-only)
+- [x] Deploy rules to the live project — Firestore and Storage rules both
+      deployed to `dressmanager-540ba`
 
 ## Phase 6 — Mobile NFC scanner
 - [ ] React Native app scaffold (Expo dev build or bare) + Firebase + Google auth
@@ -105,12 +119,77 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
   starting point.
 
 ## Phase 7 — Polish & deploy
-- [ ] Deploy Firestore + Storage rules
-- [ ] Deploy Cloud Functions (`transferItem`, `requestKit`, `assignRole`)
-- [ ] Deploy web to Firebase Hosting
+- [x] Deploy Firestore + Storage rules
+- [x] Deploy Cloud Functions (`transferItem`, `requestKit`, `assignRole`) —
+      live in `europe-west1` (colocated with Firestore `eur3` and Storage
+      `europe-west1`, set via `setGlobalOptions({region: "europe-west1"})`;
+      client SDK's `getFunctions(app, 'europe-west1')` must match). Along the
+      way: removed the unused `firebase-functions-test` devDependency, whose
+      `jest` peer dependency resolved inconsistently between local npm and
+      Cloud Build's npm and was failing `npm ci` remotely with "out of sync"
+      even though it was fine locally.
+- [x] Deploy web to Firebase Hosting — live at https://dressmanager-540ba.web.app
 - [ ] Distribute mobile builds (TestFlight / internal track)
 - [ ] Seed/demo data script
 - [ ] Basic end-to-end walkthrough of the full checkout → return loop
+
+## Phase 8 — Platform Administration (SaaS operator layer)
+- [x] `platformAdmins/{uid}` allowlist collection — doc existence is the grant;
+      first entry bootstrapped manually via the Firestore REST API for
+      `edgarsma@gmail.com` (UID `doN9q1ratTZjrHGNWMBAuEJfuSf2`) since nothing
+      inside the app can grant the first Platform Admin
+- [x] `plans/{planId}` collection (name, priceMonthly, maxMembers, maxItems) —
+      metadata only, no payment processor integration
+- [x] `subscriptions` gained `planId`/`status` fields, Platform-Admin-editable
+- [x] Firestore rules: `isPlatformAdmin()` helper ORed into every tenant-scoped
+      rule (read + write), so a Platform Admin can access any subscription's
+      data directly
+- [x] Cloud Functions: server-side `isPlatformAdmin(uid)` bypass added to
+      `transferItem`, `requestKit`, `assignRole` — independent of the client
+      illusion below, this is the actual enforcement
+- [x] `AuthContext` extended with `isPlatformAdmin` + impersonation state:
+      "Manage as" synthesizes a `userData` with the target subscription's ID
+      and every one of its real groups mapped to `superadmin`, so all existing
+      tenant-scoped pages work unmodified while impersonating
+- [x] `PlatformAdminPage` — lists all subscriptions, edit
+      name/status/planId/ownerUserId, "Manage as" button
+- [x] `PlansPage` — pricing/limit plan CRUD
+- [x] `MetricsPage` — site-wide aggregate counts (subscriptions/groups/users/
+      items/kits/requests) via `getCountFromServer`
+- [x] Persistent "Impersonating: {name} — Exit" banner in `App.tsx`; menu items
+      for the three screens above only shown to Platform Admin
+- [x] Deployed rules + functions + hosting; verified via `firebase functions:list`
+      and hosting route checks
+
+### Known gaps / not done
+- [ ] No UI to grant/revoke *additional* Platform Admins (only one exists by
+      design today) — would need a callable function restricted to existing
+      Platform Admins, or manual Firestore doc creation like the bootstrap step
+- [ ] `plan.maxMembers`/`maxItems` are metadata only — nothing enforces them
+      (e.g. `ItemsPage`'s "Add Item" doesn't check against the assigned plan)
+- [ ] `requestKit` while impersonating: a Platform Admin has no `size`/`gender`
+      of their own, so kit auto-fulfillment while impersonating won't match
+      any items — pre-existing edge case, not fixed (impersonation is for
+      admin/support tasks, not for placing requests as if a member)
+- [ ] No real payment processor integration (Stripe etc.) — explicitly out of
+      scope for this pass, see agents.md/CLAUDE.md for the decision
+
+## Data model doc/code discrepancies (found while writing web/src/types/models.ts)
+Writing real TypeScript interfaces against the actual imported code surfaced
+two places where the implementation quietly diverged from what CLAUDE.md/
+agents.md document:
+- [ ] `groupId` is documented on `classes`/`types`/`items`/`kits`, but no page
+      (`ClassesPage`, `TypesPage`, `ItemsPage`, `KitsPage`) ever actually
+      writes it - catalog data is only ever scoped by `subscriptionId` in
+      practice. `ItemDetail`'s single-item request flow writes
+      `groupId: item.groupId` when creating a request, which is therefore
+      always `undefined` today. Decide: add real `groupId` support to the
+      catalog pages, or drop it from the documented schema for these
+      collections (a subscription-only scope may be all that's needed).
+- [ ] `ownerId` (the long-term "owner" half of the Owner-vs-Holder model) is
+      documented on `items` but never read or written anywhere in the UI -
+      only `holderId` is actually tracked. Decide: implement the owner
+      concept for real, or simplify the docs to describe only `holderId`.
 
 ## Open questions / decisions to revisit
 - [ ] Kit "size" model — one kit size, or per-item sizing at fulfillment time?

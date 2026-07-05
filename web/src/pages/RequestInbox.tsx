@@ -4,12 +4,13 @@ import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp }
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
+import type { TransferRequest } from '../types/models';
 
 const { Title } = Typography;
 
 const RequestInbox: React.FC = () => {
   const { user, userData } = useAuth();
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<TransferRequest[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -17,13 +18,13 @@ const RequestInbox: React.FC = () => {
 
     // Admin sees all pending; user sees requests where they are the current holder
     const isAdmin = Object.values(userData.groups || {}).some(r => r === 'admin' || r === 'superadmin');
-    
-    const q = isAdmin 
+
+    const q = isAdmin
       ? query(collection(db, 'requests'), where('subscriptionId', '==', userData.subscriptionId), where('status', '==', 'pending'))
       : query(collection(db, 'requests'), where('currentHolderId', '==', user?.uid), where('status', '==', 'pending'));
 
     const unsubscribe = onSnapshot(q, (snap) => {
-      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransferRequest)));
     });
 
     return () => unsubscribe();
@@ -57,18 +58,18 @@ const RequestInbox: React.FC = () => {
   };
 
   const columns = [
-    { title: 'Requested At', dataIndex: 'requestedAt', render: (d: any) => d?.toDate()?.toLocaleString() },
+    { title: 'Requested At', dataIndex: 'requestedAt', render: (d: TransferRequest['requestedAt']) => d?.toDate()?.toLocaleString() },
     { title: 'Item ID', dataIndex: 'itemId' },
     { title: 'Requester', dataIndex: 'requestedByUserId' },
-    { 
-      title: 'Status', 
+    {
+      title: 'Status',
       dataIndex: 'status',
       render: (s: string) => <Tag color="gold">{s.toUpperCase()}</Tag>
     },
     {
       title: 'Action',
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: TransferRequest) => (
         <Space>
           <Button 
             type="primary" 

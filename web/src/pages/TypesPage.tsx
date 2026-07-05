@@ -4,13 +4,14 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
+import type { AssetClass, ItemType } from '../types/models';
 
 const TypesPage: React.FC = () => {
   const { userData } = useAuth();
-  const [types, setTypes] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
+  const [types, setTypes] = useState<ItemType[]>([]);
+  const [classes, setClasses] = useState<AssetClass[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingType, setEditingType] = useState<any>(null);
+  const [editingType, setEditingType] = useState<ItemType | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -22,7 +23,7 @@ const TypesPage: React.FC = () => {
       where('subscriptionId', '==', userData.subscriptionId)
     );
     const unsubTypes = onSnapshot(qTypes, (snapshot) => {
-      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ItemType)));
     });
 
     // Sync Classes for the dropdown
@@ -31,7 +32,7 @@ const TypesPage: React.FC = () => {
       where('subscriptionId', '==', userData.subscriptionId)
     );
     const unsubClasses = onSnapshot(qClasses, (snapshot) => {
-      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AssetClass)));
     });
 
     return () => {
@@ -46,13 +47,14 @@ const TypesPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: any) => {
+  const handleEdit = (record: ItemType) => {
     setEditingType(record);
     form.setFieldsValue(record);
     setIsModalOpen(true);
   };
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: Pick<ItemType, 'name' | 'classId' | 'gender' | 'imageUrl'>) => {
+    if (!userData?.subscriptionId) return;
     try {
       const data = {
         ...values,
@@ -72,29 +74,29 @@ const TypesPage: React.FC = () => {
   };
 
   const columns = [
-    { 
-      title: 'Image', 
-      dataIndex: 'imageUrl', 
+    {
+      title: 'Image',
+      dataIndex: 'imageUrl',
       key: 'imageUrl',
       render: (url: string) => url ? <img src={url} alt="type" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : 'No image'
     },
     { title: 'Name', dataIndex: 'name', key: 'name' },
-    { 
-      title: 'Class', 
-      dataIndex: 'classId', 
+    {
+      title: 'Class',
+      dataIndex: 'classId',
       key: 'classId',
       render: (id: string) => classes.find(c => c.id === id)?.name || 'Unknown'
     },
-    { 
-      title: 'Gender', 
-      dataIndex: 'gender', 
+    {
+      title: 'Gender',
+      dataIndex: 'gender',
       key: 'gender',
       render: (g: string) => <Tag color={g === 'male' ? 'blue' : g === 'female' ? 'magenta' : 'default'}>{g.toUpperCase()}</Tag>
     },
     {
       title: 'Action',
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: ItemType) => (
         <Space size="middle">
           <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
           <Popconfirm title="Sure to delete?" onConfirm={() => deleteDoc(doc(db, 'types', record.id))}>
@@ -124,9 +126,9 @@ const TypesPage: React.FC = () => {
           <Form.Item name="imageUrl" label="Type Image">
             <ImageUpload folder="types" />
           </Form.Item>
-          <Form.Item 
-            name="name" 
-            label="Type Name" 
+          <Form.Item
+            name="name"
+            label="Type Name"
             rules={[{ required: true }]}
           >
             <Input placeholder="e.g. Red Floral Skirt" />

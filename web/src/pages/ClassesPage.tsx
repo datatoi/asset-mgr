@@ -3,12 +3,13 @@ import { Table, Button, Modal, Form, Input, Space, message, Popconfirm } from 'a
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
+import type { AssetClass } from '../types/models';
 
 const ClassesPage: React.FC = () => {
   const { userData } = useAuth();
-  const [classes, setClasses] = useState<any[]>([]);
+  const [classes, setClasses] = useState<AssetClass[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState<any>(null);
+  const [editingClass, setEditingClass] = useState<AssetClass | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -20,7 +21,7 @@ const ClassesPage: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AssetClass));
       setClasses(data);
     });
 
@@ -33,7 +34,7 @@ const ClassesPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: any) => {
+  const handleEdit = (record: AssetClass) => {
     setEditingClass(record);
     form.setFieldsValue(record);
     setIsModalOpen(true);
@@ -48,7 +49,8 @@ const ClassesPage: React.FC = () => {
     }
   };
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: Pick<AssetClass, 'name'>) => {
+    if (!userData?.subscriptionId) return;
     try {
       if (editingClass) {
         await updateDoc(doc(db, 'classes', editingClass.id), values);
@@ -71,7 +73,7 @@ const ClassesPage: React.FC = () => {
     {
       title: 'Action',
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: AssetClass) => (
         <Space size="middle">
           <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
           <Popconfirm title="Sure to delete?" onConfirm={() => handleDelete(record.id)}>
@@ -97,9 +99,9 @@ const ClassesPage: React.FC = () => {
         onOk={() => form.submit()}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item 
-            name="name" 
-            label="Class Name" 
+          <Form.Item
+            name="name"
+            label="Class Name"
             rules={[{ required: true, message: 'Please input class name' }]}
           >
             <Input placeholder="e.g. Dress, Shoes, Trousers" />

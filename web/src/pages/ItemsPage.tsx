@@ -4,13 +4,14 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
+import type { Item, ItemType } from '../types/models';
 
 const ItemsPage: React.FC = () => {
   const { userData } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
-  const [types, setTypes] = useState<any[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [types, setTypes] = useState<ItemType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
@@ -18,18 +19,19 @@ const ItemsPage: React.FC = () => {
 
     const qItems = query(collection(db, 'items'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubItems = onSnapshot(qItems, (snapshot) => {
-      setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Item)));
     });
 
     const qTypes = query(collection(db, 'types'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubTypes = onSnapshot(qTypes, (snapshot) => {
-      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ItemType)));
     });
 
     return () => { unsubItems(); unsubTypes(); };
   }, [userData]);
 
-  const onFinish = async (values: any) => {
+  const onFinish = async (values: Pick<Item, 'typeId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl'>) => {
+    if (!userData?.subscriptionId) return;
     try {
       const data = {
         ...values,
@@ -54,32 +56,32 @@ const ItemsPage: React.FC = () => {
   };
 
   const columns = [
-    { 
-      title: 'Image', 
-      dataIndex: 'imageUrl', 
-      render: (url: string) => <img src={url} alt="item" style={{ width: 40, height: 40, borderRadius: 4 }} /> 
+    {
+      title: 'Image',
+      dataIndex: 'imageUrl',
+      render: (url: string) => <img src={url} alt="item" style={{ width: 40, height: 40, borderRadius: 4 }} />
     },
-    { 
-      title: 'Type', 
-      dataIndex: 'typeId', 
+    {
+      title: 'Type',
+      dataIndex: 'typeId',
       render: (id: string) => types.find(t => t.id === id)?.name || 'Unknown'
     },
     { title: 'Size', dataIndex: 'size' },
-    { 
-      title: 'Gender', 
+    {
+      title: 'Gender',
       dataIndex: 'gender',
       render: (g: string) => <Tag color={g === 'male' ? 'blue' : 'magenta'}>{g?.toUpperCase()}</Tag>
     },
     { title: 'RFID Tag', dataIndex: 'rfidTag' },
-    { 
-      title: 'Holder', 
+    {
+      title: 'Holder',
       dataIndex: 'holderId',
       render: (h: string) => h === 'storage' ? <Tag color="green">STORAGE</Tag> : h
     },
     {
       title: 'Action',
       key: 'action',
-      render: (_: any, record: any) => (
+      render: (_: unknown, record: Item) => (
         <Space>
           <Button type="link" onClick={() => { setEditingItem(record); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
           <Popconfirm title="Delete item?" onConfirm={() => deleteDoc(doc(db, 'items', record.id))}><Button type="link" danger>Delete</Button></Popconfirm>

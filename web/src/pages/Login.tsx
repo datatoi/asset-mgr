@@ -8,18 +8,20 @@ const { Title, Text } = Typography;
 const { Content } = Layout;
 
 const LoginPage: React.FC = () => {
-  const { login, user, userData, loading } = useAuth();
+  const { login, user, userData, loading, isPlatformAdmin } = useAuth();
   const navigate = useNavigate();
 
   React.useEffect(() => {
     if (!loading && user) {
       if (userData) {
         navigate('/dashboard');
+      } else if (isPlatformAdmin) {
+        navigate('/platform-admin');
       } else {
         navigate('/register');
       }
     }
-  }, [user, userData, loading, navigate]);
+  }, [user, userData, isPlatformAdmin, loading, navigate]);
 
   return (
     <Layout style={{ minHeight: '100vh', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5' }}>

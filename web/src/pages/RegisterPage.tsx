@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Card, Typography, Layout, message } from 'antd';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, writeBatch } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../lib/firebase';
 
 const { Title } = Typography;
 const { Content } = Layout;
@@ -17,44 +17,13 @@ const RegisterPage: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      const batch = writeBatch(db);
-      
-      // 1. Create Subscription
-      const subRef = doc(collection(db, 'subscriptions'));
-      batch.set(subRef, {
-        name: values.orgName,
-        ownerUserId: user.uid,
-        createdAt: new Date().toISOString()
-      });
-
-      // 2. Create first Group
-      const groupRef = doc(collection(db, 'groups'));
-      batch.set(groupRef, {
-        subscriptionId: subRef.id,
-        name: values.groupName,
-        description: 'Default group',
-        createdAt: new Date().toISOString()
-      });
-
-      // 3. Create User doc
-      const userRef = doc(db, 'users', user.uid);
-      batch.set(userRef, {
-        subscriptionId: subRef.id,
-        name: user.displayName || 'Anonymous',
-        email: user.email,
-        avatarUrl: user.photoURL,
-        groups: {
-          [groupRef.id]: 'superadmin'
-        },
-        createdAt: new Date().toISOString()
-      });
-
-      await batch.commit();
+      const registerSubscription = httpsCallable(functions, 'registerSubscription');
+      await registerSubscription(values);
       message.success('Account setup complete!');
       navigate('/dashboard');
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      message.error('Failed to setup account: ' + error.message);
+      message.error('Failed to setup account: ' + (error instanceof Error ? error.message : String(error)));
     } finally {
       setLoading(false);
     }

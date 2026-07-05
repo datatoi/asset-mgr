@@ -5,6 +5,7 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { SearchOutlined } from '@ant-design/icons';
+import type { AssetClass, Item, ItemType } from '../types/models';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -12,22 +13,22 @@ const { Option } = Select;
 const Dashboard: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
-  const [items, setItems] = useState<any[]>([]);
-  const [types, setTypes] = useState<any[]>([]);
-  const [classes, setClasses] = useState<any[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [types, setTypes] = useState<ItemType[]>([]);
+  const [classes, setClasses] = useState<AssetClass[]>([]);
   const [filters, setFilters] = useState({ typeId: '', classId: '', size: '', search: '' });
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
 
     const qItems = query(collection(db, 'items'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubItems = onSnapshot(qItems, (snap) => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubItems = onSnapshot(qItems, (snap) => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Item))));
 
     const qTypes = query(collection(db, 'types'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubTypes = onSnapshot(qTypes, (snap) => setTypes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubTypes = onSnapshot(qTypes, (snap) => setTypes(snap.docs.map(d => ({ id: d.id, ...d.data() } as ItemType))));
 
     const qClasses = query(collection(db, 'classes'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubClasses = onSnapshot(qClasses, (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubClasses = onSnapshot(qClasses, (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() } as AssetClass))));
 
     return () => { unsubItems(); unsubTypes(); unsubClasses(); };
   }, [userData]);
