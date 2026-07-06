@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { Spin } from 'antd';
 
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, userData, isPlatformAdmin } = useAuth();
+  const { user, loading, userData } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -15,9 +15,8 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // A Platform Admin may have no subscription of their own - only redirect to
-  // registration if they're neither in a subscription nor a Platform Admin.
-  if (!userData && !isPlatformAdmin && location.pathname !== '/register') {
+  // If user is logged in but has no subscription data, redirect to registration
+  if (!userData && location.pathname !== '/register') {
     return <Navigate to="/register" replace />;
   }
 

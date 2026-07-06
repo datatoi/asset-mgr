@@ -30,7 +30,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, folder }) =>
       message.success('Image uploaded successfully');
     } catch (error) {
       setLoading(false);
-      message.error('Upload failed');
+      message.error('Upload failed: ' + (error instanceof Error ? error.message : String(error)));
       console.error(error);
     }
   };

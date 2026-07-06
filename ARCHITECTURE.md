@@ -43,12 +43,9 @@ Two client surfaces share one Firebase backend and one Firestore data model.
   fields directly, enforced by `firestore.rules`.
 - Both clients authenticate with the same Firebase Auth (Google Sign-in) so every
   action — including an NFC scan — is attributed to a real user.
-- A **Platform Admin** layer sits above all subscriptions (this is a SaaS
-  product): one site-wide operator, granted via a `platformAdmins/{uid}`
-  allowlist doc, can list/edit any subscription, fully impersonate one via
-  "Manage as," manage pricing plans, and view site-wide metrics. Enforced
-  server-side in both `firestore.rules` and the Cloud Functions — see
-  [CLAUDE.md#platform-administration-saas-operator-layer](CLAUDE.md).
+- **Open source, self-hosted**: no site-wide operator role. Each deployer owns
+  their Firebase project outright (Console/`gcloud` access), so there's no
+  in-app "platform admin" layer — see [docs/installation.md](docs/installation.md).
 
 See [CLAUDE.md](CLAUDE.md) for the full Firestore collection schema and
 [CLAUDE.md#key-workflows](CLAUDE.md) for how a kit request/approval flows through
@@ -62,6 +59,12 @@ asset-mgr/
 ├── CLAUDE.md                 Data model, workflows, conventions (source of truth)
 ├── ARCHITECTURE.md            This file — system + repo structure
 ├── todo.md                    Phased build plan / progress tracker
+├── docs/
+│   └── installation.md        Step-by-step guide: deploying a fresh instance
+│                                to your own Firebase/GCP project
+├── scripts/
+│   └── install.sh              Automates most of installation.md end to end
+│                                (idempotent, safe to re-run)
 │
 ├── firebase.json              Firebase project config: firestore/storage/
 │                               hosting/functions/emulators wiring
@@ -102,10 +105,7 @@ asset-mgr/
 │       │   ├── KitsPage.tsx          Kit CRUD (admin) + "Request Kit" (user, calls requestKit)
 │       │   ├── RequestInbox.tsx      Approve (calls transferItem) / decline pending requests
 │       │   ├── MembersPage.tsx       Per-group role assignment (calls assignRole)
-│       │   ├── ProfilePage.tsx       Edit own size/gender/avatar
-│       │   ├── PlatformAdminPage.tsx  All subscriptions: edit metadata, "Manage as" impersonation
-│       │   ├── PlansPage.tsx          Pricing/limit plan CRUD (Platform Admin only)
-│       │   └── MetricsPage.tsx        Site-wide aggregate counts (Platform Admin only)
+│       │   └── ProfilePage.tsx       Edit own size/gender/avatar
 │       └── assets/                   Static assets
 │
 ├── mobile/                     NFC scanner — draft only, not a scaffolded project yet

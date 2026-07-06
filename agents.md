@@ -5,15 +5,17 @@
 > brief (v2, revised after scoping).
 
 ## Objective
-Build a multi-tenant **SaaS** web + mobile application to manage shared costumes
-for organizations such as folk dance groups. A group may have ~30 members but
-only a limited number of complete costume **kits** (e.g. 10 male + 10 female of
-each kind), so the core mechanic is **availability + checkout/booking** of kits
-and items. **NFC RFID tags** provide fast physical identification of garments.
-The app supports role-based access (per-group superadmin / admin / user) and
-asset transfers between people, plus a site-wide **Platform Admin** who operates
-the SaaS itself (see "Platform Administration" below) — distinct from the
-per-group `superadmin` role, which only has authority within one subscription.
+Build a multi-tenant, **open-source, self-hosted** web + mobile application to
+manage shared costumes for organizations such as folk dance groups. Each
+deployer runs their own Firebase project (see
+[docs/installation.md](docs/installation.md)) — there is no hosted SaaS and no
+site-wide operator role; whoever deploys it already has full Console/`gcloud`
+access to their own instance. A group may have ~30 members but only a limited
+number of complete costume **kits** (e.g. 10 male + 10 female of each kind), so
+the core mechanic is **availability + checkout/booking** of kits and items.
+**NFC RFID tags** provide fast physical identification of garments. The app
+supports role-based access (per-group superadmin / admin / user) and asset
+transfers between people.
 
 ## Overall Architecture — two surfaces, one backend
 *   **Web app** (management-heavy): React.js + Ant Design, hosted on Firebase
@@ -97,20 +99,6 @@ physically has the item right now. **History tracks holder changes.**
 7.  **Subscription/Group Administration** (subscription owner / superadmin) —
     manage groups and members within the subscription.
 
-8.  **Platform Admin screens** (Platform Admin only — a single, site-wide role,
-    separate from any subscription):
-    *   **Subscriptions list** — every subscription on the site; edit `name`,
-        `status` (active/suspended), `planId`, `ownerUserId` directly.
-    *   **"Manage as" / impersonation** — act as full admin inside any one
-        subscription's data (catalog, members, requests) to support/debug it.
-        A persistent banner shows which subscription is being impersonated,
-        with an explicit exit action.
-    *   **Plans management** — CRUD pricing/limit plans (`name`,
-        `priceMonthly`, `maxMembers`, `maxItems`); metadata only, no payment
-        processor integration in this pass.
-    *   **Metrics dashboard** — site-wide counts (subscriptions, users, items,
-        requests) across all tenants.
-
 ## Backend (Cloud Functions) Requirements
 
 **Technology Stack:** Node.js Firebase Cloud Functions 2.0.
@@ -159,12 +147,6 @@ physically has the item right now. **History tracks holder changes.**
 *   `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
     `currentHolderId`, `status` (`pending`|`approved`|`declined`|`transferred`),
     `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`.
-*   `subscriptions/{subId}` additionally carries `planId?`, `status`
-    (`active`|`suspended`) — Platform-Admin-managed.
-*   `plans/{planId}` — `name`, `description`, `priceMonthly`, `maxMembers`,
-    `maxItems`.
-*   `platformAdmins/{uid}` — `grantedAt`, `grantedBy`. Doc existence (keyed by
-    Auth UID) is the grant itself — an allowlist, not a role field.
 
 ## Authentication & Authorization
 
@@ -176,13 +158,6 @@ physically has the item right now. **History tracks holder changes.**
 *   Only `admin`/`superadmin` (per group) can **write** catalog collections
     (classes, types, items, kits, groups).
 *   Any authenticated user can create `comments` on an item and create `requests`.
-*   **Platform Admin** (per `platformAdmins/{uid}` doc existence) bypasses the
-    per-subscription checks entirely — both in security rules (every
-    tenant-scoped rule ORs in an `isPlatformAdmin()` check) and inside the
-    privileged Cloud Functions (`transferItem`, `requestKit`, `assignRole`
-    each OR in a server-side `isPlatformAdmin(uid)` check). This is what makes
-    full impersonation ("Manage as") possible while still keeping the
-    enforcement server-side, not just a client-side illusion.
 *   Privileged writes (holder/role changes) are performed by Cloud Functions and
     allowed only from the trusted service account.
 *   Users can only update their own `users` profile data.

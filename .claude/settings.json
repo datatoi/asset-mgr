@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"exit code: $?\")",
+      "Bash(gh repo *)",
+      "Bash(grep -i \"\\\\.env$\\\\|\\\\.env\\\\.\")",
+      "Bash(curl -s -X DELETE 'https://firestore.googleapis.com/v1/projects/dressmanager-540ba/databases/\\(default\\)/documents/platformAdmins/doN9q1ratTZjrHGNWMBAuEJfuSf2' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'x-goog-user-project: dressmanager-540ba')",
+      "Bash(chmod +x /Users/edgars/ws/asset-mgr/scripts/install.sh)",
+      "Bash(bash -n /Users/edgars/ws/asset-mgr/scripts/install.sh)",
+      "Bash(firebase apps:list WEB --project=dressmanager-540ba --json)",
+      "Bash(firebase apps:sdkconfig WEB 1:448285598667:web:5c6e8e0de3795cd5984c4e --project=dressmanager-540ba --json)",
+      "Bash(firebase firestore:databases:get '\\(default\\)' --project=dressmanager-540ba)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -sf https://firebasestorage.googleapis.com/v1beta/projects/dressmanager-540ba/defaultBucket -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'x-goog-user-project: dressmanager-540ba')",
+      "Bash(node /private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad/test-storage-rules.js)",
+      "Bash(curl -s https://firebaserules.googleapis.com/v1/projects/dressmanager-540ba/releases/firebase.storage%2Fdressmanager-540ba.firebasestorage.app -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'x-goog-user-project: dressmanager-540ba')",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('cors_config', 'NO CORS CONFIG SET'\\), indent=2\\)\\)\")",
+      "Bash(node /private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad/test-real-storage.js)",
+      "WebSearch",
+      "Bash(gcloud projects *)",
+      "Bash(gcloud iam *)",
+      "Bash(rm -f /private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad/test-storage-rules*.js /private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad/test-real-storage.js *)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad"
+    ]
+  }
+}

@@ -12,6 +12,15 @@ limited number of complete costume **kits** (e.g. 10 male + 10 female of each ki
 so the core mechanic is **availability + checkout/booking** of kits and items, with
 **NFC RFID tags** for fast physical identification.
 
+**Open source, self-hosted**: each deployer runs their own Firebase project
+(see [docs/installation.md](docs/installation.md)). There is no hosted
+multi-tenant SaaS and no site-wide operator role — whoever deploys the
+project already has full Firebase Console/`gcloud` access to their own
+instance, so there's nothing a separate in-app "platform admin" would add.
+Multi-tenancy (Subscriptions/Groups, see below) exists so one deployed
+instance can serve more than one organization if desired, not to support a
+hosted-SaaS billing/operator model.
+
 ## Architecture — two surfaces, one backend
 
 1. **Web app** (management-heavy): React + Ant Design + Firebase client SDKs.
@@ -51,12 +60,6 @@ so the core mechanic is **availability + checkout/booking** of kits and items, w
 - Roles are **per-group**, stored in the user's `groups` map: `superadmin` |
   `admin` | `user`. The subscription owner is the highest authority for their sub.
 - Every tenant-scoped document carries a `subscriptionId`.
-- **Platform Admin** is a separate, site-wide role that sits *above* all
-  subscriptions (this is a SaaS product — Platform Admin is the operator of the
-  whole site, not a tenant). Deliberately named differently from the per-group
-  `superadmin` role so the two are never confused: `superadmin` is the top role
-  *within one subscription*; Platform Admin spans *all* subscriptions. See
-  "Platform Administration" below.
 
 ## Data model (Firestore)
 
@@ -81,16 +84,6 @@ Catalog hierarchy: **Class → Type → Item**, plus **Kit** (checkout unit).
 - `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
   `currentHolderId`, `status` (`pending`|`approved`|`declined`|`transferred`),
   `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`
-- `subscriptions/{subId}` also carries `planId?` (ref to `plans`) and `status`
-  (`active`|`suspended`, default `active`) — both Platform-Admin-managed.
-- `plans/{planId}` — `name`, `description`, `priceMonthly`, `maxMembers`,
-  `maxItems`. Metadata only for now — no payment processor integration;
-  Platform Admin assigns a plan to a subscription manually.
-- `platformAdmins/{uid}` — `grantedAt`, `grantedBy`. Existence of a doc here
-  (doc ID = Firebase Auth UID) is the *entire* grant — an allowlist, not a
-  role value. The very first entry must be created manually (Console/`gcloud`,
-  since nothing can grant the first Platform Admin from within the app);
-  see [todo.md](todo.md) for the bootstrap step actually used.
 
 ### Owner vs Holder
 Both are **people**. `ownerId` = long-term assigned person; `holderId` = who
@@ -118,47 +111,6 @@ available items.
 - Any authenticated user may add `comments` and create `requests`.
 - **All holder/role changes go through Cloud Functions** — never trust client-side
   writes for these, even during early iteration.
-- **Platform Admin bypasses per-subscription checks everywhere** — both in
-  Firestore rules (an `isPlatformAdmin()` check ORed into every tenant-scoped
-  rule) and inside `transferItem`/`requestKit`/`assignRole` (an
-  `isPlatformAdmin(uid)` bypass alongside the normal per-group role check).
-  This is what makes full impersonation possible.
-
-## Platform Administration (SaaS operator layer)
-
-A single Platform Admin operates the whole site (see [todo.md](todo.md) for
-why "single admin, allowlist doc" was chosen over custom claims or a
-multi-admin model — kept intentionally minimal since there's exactly one
-operator today).
-
-- **Grant mechanism**: existence of `platformAdmins/{uid}` (doc ID = the
-  Firebase Auth UID). No other fields matter for authorization — `grantedAt`/
-  `grantedBy` are just audit metadata.
-- **Full impersonation model**: from the Platform Admin screen, clicking
-  "Manage as" on a subscription sets client-side impersonation state. While
-  impersonating, `AuthContext` presents a *synthesized* `userData` — real
-  `subscriptionId` and `groups` map replaced with the target subscription's ID
-  and every one of its real `groupId`s mapped to `'superadmin'` — so every
-  existing tenant-scoped page (Dashboard, Items/Types/Classes/KitsPage,
-  MembersPage, RequestInbox, ItemDetail) works completely unmodified while
-  impersonating; they just read `userData` as always.
-  - This client-side illusion is **not** what enforces security. The real
-    enforcement is server-side: Firestore rules check the actual
-    `platformAdmins/{uid}` doc (independent of anything the client claims),
-    and the three privileged Cloud Functions do the same before falling back
-    to the normal per-group role check.
-  - A persistent "Impersonating: {subscription name} — Exit" banner is shown
-    globally whenever impersonation is active, so it's never ambiguous whose
-    data is on screen.
-- **Subscription management**: Platform Admin can list all subscriptions and
-  edit `name`/`status`/`planId`/`ownerUserId` directly (simple metadata, no
-  Cloud Function needed — plain Firestore writes allowed by rules).
-- **Plans**: Platform Admin CRUDs the `plans` collection and assigns a
-  `planId` to each subscription. No enforcement of `maxMembers`/`maxItems`
-  limits yet — metadata only, for future use.
-- **Metrics**: a basic site-wide dashboard (subscription/user/item/request
-  counts across *all* tenants) — only Platform Admin can query without a
-  `subscriptionId` filter, per the rules bypass above.
 
 ## Status
 Core web app scaffolded and functional (Firebase project, auth, subscription

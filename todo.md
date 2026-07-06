@@ -58,6 +58,29 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       just any "Dress"); also simplified `requestKit` by removing the
       now-unneeded classId→typeIds resolution step
 - [x] Image upload/preview component (reused for types, items, avatars)
+- [x] Fixed a real bug: "Add Type" (and equally Items/Profile avatar) failed
+      with a generic "Operation failed" whenever no image was uploaded. Cause:
+      the Firestore JS SDK throws client-side on any field with value
+      `undefined` (e.g. `imageUrl` before `ImageUpload`'s `onChange` ever
+      fires), and the SDK doesn't do this by default. Fixed at the root by
+      switching `web/src/lib/firebase.ts` from `getFirestore(app)` to
+      `initializeFirestore(app, { ignoreUndefinedProperties: true })`. Also
+      made every CRUD page's generic catch surface the real error message
+      instead of a static string, so this class of bug fails loudly next time.
+- [x] Fixed a second real bug, found right after the first thanks to the
+      better error surfacing: actual image *uploads* (not just missing ones)
+      failed with `storage/unauthorized`, even for a confirmed `superadmin`
+      user and correctly-deployed rules. Root cause: `storage.rules` calls
+      `firestore.get()` (cross-service Security Rules) to check the caller's
+      role - the Console's "Publish" button auto-grants the IAM role this
+      needs to the Storage service account, but our CLI-only deploys never
+      did. Fixed by granting `roles/firebaserules.firestoreServiceAgent` to
+      `service-{PROJECT_NUMBER}@gcp-sa-firebasestorage.iam.gserviceaccount.com`
+      directly via `gcloud projects add-iam-policy-binding`. Diagnosed by
+      testing the rules logic itself against the emulator first (proved
+      correct in both positive/negative cases) before looking at IAM, and
+      folded the grant into `scripts/install.sh` + `docs/installation.md` so
+      new deployments don't hit this.
 
 ## Phase 3 — Browsing & detail (web)
 - [x] Dashboard: list all items, filter by class / type / search (client-side
@@ -133,46 +156,18 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 - [ ] Seed/demo data script
 - [ ] Basic end-to-end walkthrough of the full checkout → return loop
 
-## Phase 8 — Platform Administration (SaaS operator layer)
-- [x] `platformAdmins/{uid}` allowlist collection — doc existence is the grant;
-      first entry bootstrapped manually via the Firestore REST API for
-      `edgarsma@gmail.com` (UID `doN9q1ratTZjrHGNWMBAuEJfuSf2`) since nothing
-      inside the app can grant the first Platform Admin
-- [x] `plans/{planId}` collection (name, priceMonthly, maxMembers, maxItems) —
-      metadata only, no payment processor integration
-- [x] `subscriptions` gained `planId`/`status` fields, Platform-Admin-editable
-- [x] Firestore rules: `isPlatformAdmin()` helper ORed into every tenant-scoped
-      rule (read + write), so a Platform Admin can access any subscription's
-      data directly
-- [x] Cloud Functions: server-side `isPlatformAdmin(uid)` bypass added to
-      `transferItem`, `requestKit`, `assignRole` — independent of the client
-      illusion below, this is the actual enforcement
-- [x] `AuthContext` extended with `isPlatformAdmin` + impersonation state:
-      "Manage as" synthesizes a `userData` with the target subscription's ID
-      and every one of its real groups mapped to `superadmin`, so all existing
-      tenant-scoped pages work unmodified while impersonating
-- [x] `PlatformAdminPage` — lists all subscriptions, edit
-      name/status/planId/ownerUserId, "Manage as" button
-- [x] `PlansPage` — pricing/limit plan CRUD
-- [x] `MetricsPage` — site-wide aggregate counts (subscriptions/groups/users/
-      items/kits/requests) via `getCountFromServer`
-- [x] Persistent "Impersonating: {name} — Exit" banner in `App.tsx`; menu items
-      for the three screens above only shown to Platform Admin
-- [x] Deployed rules + functions + hosting; verified via `firebase functions:list`
-      and hosting route checks
-
-### Known gaps / not done
-- [ ] No UI to grant/revoke *additional* Platform Admins (only one exists by
-      design today) — would need a callable function restricted to existing
-      Platform Admins, or manual Firestore doc creation like the bootstrap step
-- [ ] `plan.maxMembers`/`maxItems` are metadata only — nothing enforces them
-      (e.g. `ItemsPage`'s "Add Item" doesn't check against the assigned plan)
-- [ ] `requestKit` while impersonating: a Platform Admin has no `size`/`gender`
-      of their own, so kit auto-fulfillment while impersonating won't match
-      any items — pre-existing edge case, not fixed (impersonation is for
-      admin/support tasks, not for placing requests as if a member)
-- [ ] No real payment processor integration (Stripe etc.) — explicitly out of
-      scope for this pass, see agents.md/CLAUDE.md for the decision
+## Phase 8 — Platform Administration (reverted)
+Built, then fully removed: a site-wide "Platform Admin" role
+(`platformAdmins/{uid}` allowlist), a `plans` collection + `Subscription.planId`/
+`status`, an `isPlatformAdmin()` bypass in `firestore.rules` and in
+`transferItem`/`requestKit`/`assignRole`, "Manage as" impersonation in
+`AuthContext`, and three UI pages (`PlatformAdminPage`, `PlansPage`,
+`MetricsPage`). Reason: this became an **open-source, self-hosted** app —
+each deployer already has full Console/`gcloud` access to their own Firebase
+project, so a separate in-app operator role/impersonation layer added
+complexity without adding capability. See [docs/installation.md](docs/installation.md)
+for the self-hosting model. `scripts/install.sh` was written for this simpler
+world — no "bootstrap the first Platform Admin" step needed.
 
 ## Data model doc/code discrepancies (found while writing web/src/types/models.ts)
 Writing real TypeScript interfaces against the actual imported code surfaced

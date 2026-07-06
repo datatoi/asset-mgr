@@ -58,7 +58,9 @@ const KitsPage: React.FC = () => {
         message.success('Kit created');
       }
       setIsModalOpen(false);
-    } catch (err) { message.error('Failed'); }
+    } catch (err) {
+      message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   const columns = [

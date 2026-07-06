@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { connectAuthEmulator, getAuth } from 'firebase/auth'
-import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore'
+import { connectFirestoreEmulator, initializeFirestore } from 'firebase/firestore'
 import { connectStorageEmulator, getStorage } from 'firebase/storage'
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions'
 
@@ -15,7 +15,10 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
-export const db = getFirestore(app)
+// Forms routinely submit optional fields (e.g. imageUrl before an image is
+// uploaded) as `undefined`, which the Firestore SDK rejects by default with
+// a thrown error - ignoreUndefinedProperties strips them instead of failing.
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true })
 export const storage = getStorage(app)
 // Must match the deployed Cloud Functions region (functions/src/index.ts).
 export const functions = getFunctions(app, 'europe-west1')

@@ -1,16 +1,13 @@
 import React from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Alert, Button } from 'antd';
+import { Layout, Menu } from 'antd';
 import {
   DashboardOutlined,
   SkinOutlined,
   GroupOutlined,
   TagsOutlined,
   UserOutlined,
-  InboxOutlined,
-  CrownOutlined,
-  DollarOutlined,
-  BarChartOutlined
+  InboxOutlined
 } from '@ant-design/icons';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
@@ -25,14 +22,11 @@ import KitsPage from './pages/KitsPage';
 import ProfilePage from './pages/ProfilePage';
 import RequestInbox from './pages/RequestInbox';
 import MembersPage from './pages/MembersPage';
-import PlatformAdminPage from './pages/PlatformAdminPage';
-import PlansPage from './pages/PlansPage';
-import MetricsPage from './pages/MetricsPage';
 
 const { Header, Content, Sider } = Layout;
 
 const App: React.FC = () => {
-  const { userData, isPlatformAdmin, impersonating, stopImpersonating } = useAuth();
+  const { userData } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,19 +41,9 @@ const App: React.FC = () => {
     { key: '/requests', icon: <InboxOutlined />, label: 'Requests' },
     ...(isAdmin ? [{ key: '/members', icon: <UserOutlined />, label: 'Members' }] : []),
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
-    ...(isPlatformAdmin ? [
-      { key: '/platform-admin', icon: <CrownOutlined />, label: 'Platform Admin' },
-      { key: '/plans', icon: <DollarOutlined />, label: 'Plans' },
-      { key: '/metrics', icon: <BarChartOutlined />, label: 'Metrics' },
-    ] : []),
   ];
 
   const showSider = !['/login', '/register'].includes(location.pathname);
-
-  const handleExitImpersonation = () => {
-    stopImpersonating();
-    navigate('/platform-admin');
-  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -78,18 +62,7 @@ const App: React.FC = () => {
         </Sider>
       )}
       <Layout>
-        {showSider && (
-          <Header style={{ background: '#fff', padding: 0 }}>
-            {impersonating && (
-              <Alert
-                type="warning"
-                banner
-                message={`Impersonating: ${impersonating.name}`}
-                action={<Button size="small" onClick={handleExitImpersonation}>Exit</Button>}
-              />
-            )}
-          </Header>
-        )}
+        {showSider && <Header style={{ background: '#fff', padding: 0 }} />}
         <Content style={{ margin: '24px 16px 0' }}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -103,9 +76,6 @@ const App: React.FC = () => {
             <Route path="/requests" element={<ProtectedRoute><RequestInbox /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/platform-admin" element={<ProtectedRoute><PlatformAdminPage /></ProtectedRoute>} />
-            <Route path="/plans" element={<ProtectedRoute><PlansPage /></ProtectedRoute>} />
-            <Route path="/metrics" element={<ProtectedRoute><MetricsPage /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           </Routes>
         </Content>

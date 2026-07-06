@@ -51,7 +51,7 @@ const ItemsPage: React.FC = () => {
       }
       setIsModalOpen(false);
     } catch (err) {
-      message.error('Operation failed');
+      message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 

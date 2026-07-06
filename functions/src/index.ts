@@ -12,19 +12,6 @@ setGlobalOptions({region: "europe-west1"});
 const db = admin.firestore();
 
 /**
- * Site-wide operator check - separate from the per-group 'superadmin' role.
- * Mirrors the isPlatformAdmin() rule in firestore.rules; enforcement here is
- * independent of anything the client claims (the client's "impersonation" of
- * a subscription is purely a UI illusion - this is the real check).
- * @param {string} uid Firebase Auth UID to check.
- * @return {Promise<boolean>} Whether the UID is a granted platform admin.
- */
-async function isPlatformAdmin(uid: string): Promise<boolean> {
-  const doc = await db.collection("platformAdmins").doc(uid).get();
-  return doc.exists;
-}
-
-/**
  * Bootstraps a new Subscription + first Group for the caller, and makes them
  * superadmin of that group. Firestore rules deliberately block direct client
  * writes to `subscriptions` and `groups` (you can't create a group unless
@@ -85,6 +72,73 @@ export const registerSubscription = onCall(async (request) => {
 });
 
 /**
+ * Joins the caller to an existing Subscription via its invite link
+ * (/join/{subscriptionId}), as a plain 'user' in every one of that
+ * subscription's groups. Firestore rules block direct client writes to
+ * `users.groups`/`subscriptionId` (see firestore.rules), so this - like
+ * registerSubscription - must go through the Admin SDK. Rejects if the
+ * caller already belongs to a subscription or if the link is invalid.
+ */
+export const joinSubscription = onCall(async (request) => {
+  const {auth} = request;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
+  }
+
+  const {subscriptionId} = request.data;
+  if (!subscriptionId) {
+    throw new HttpsError("invalid-argument", "Missing subscriptionId.");
+  }
+
+  const userRef = db.collection("users").doc(auth.uid);
+  const existingUser = await userRef.get();
+  if (existingUser.exists && existingUser.data()?.subscriptionId) {
+    throw new HttpsError(
+      "already-exists",
+      "This account already belongs to a subscription."
+    );
+  }
+
+  const subRef = db.collection("subscriptions").doc(subscriptionId);
+  const subDoc = await subRef.get();
+  if (!subDoc.exists) {
+    throw new HttpsError("not-found", "Invalid or expired invite link.");
+  }
+
+  const groupsSnap = await db.collection("groups")
+    .where("subscriptionId", "==", subscriptionId)
+    .get();
+  if (groupsSnap.empty) {
+    throw new HttpsError(
+      "failed-precondition",
+      "This organization has no groups to join."
+    );
+  }
+
+  const groups: Record<string, string> = {};
+  groupsSnap.docs.forEach((g) => {
+    groups[g.id] = "user";
+  });
+
+  await userRef.set({
+    subscriptionId,
+    name: auth.token.name || "Anonymous",
+    email: auth.token.email,
+    avatarUrl: auth.token.picture || null,
+    groups,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, {merge: true});
+
+  logger.info(`${auth.uid} joined subscription ${subscriptionId} via invite`);
+
+  return {
+    subscriptionId,
+    subscriptionName: subDoc.data()?.name || "",
+    groupCount: groupsSnap.size,
+  };
+});
+
+/**
  * Transfers an item to a new holder. Callable by the current holder (self
  * hand-over) or by an admin/superadmin of the item's group.
  */
@@ -116,9 +170,7 @@ export const transferItem = onCall(async (request) => {
   const userRole = userData?.groups?.[groupId];
   const isAdmin = userRole === "admin" || userRole === "superadmin";
 
-  const canTransfer = isAdmin || currentHolderId === auth.uid ||
-    (await isPlatformAdmin(auth.uid));
-  if (!canTransfer) {
+  if (!isAdmin && currentHolderId !== auth.uid) {
     throw new HttpsError(
       "permission-denied",
       "Only the current holder or an admin can transfer this item."
@@ -178,7 +230,7 @@ export const requestKit = onCall(async (request) => {
 
   const userDoc = await db.collection("users").doc(auth.uid).get();
   const userData = userDoc.data();
-  if (!userData && !(await isPlatformAdmin(auth.uid))) {
+  if (!userData) {
     throw new HttpsError("not-found", "User data not found.");
   }
 
@@ -189,8 +241,8 @@ export const requestKit = onCall(async (request) => {
 
   const kitData = kitDoc.data()!;
   const {typeIds, subscriptionId, groupId} = kitData;
-  const userSize = userData?.size;
-  const userGender = userData?.gender;
+  const userSize = userData.size;
+  const userGender = userData.gender;
 
   const batch = db.batch();
   const requestsCreated: string[] = [];
@@ -254,7 +306,7 @@ export const assignRole = onCall(async (request) => {
   const callerData = callerDoc.data();
   const callerRole = callerData?.groups?.[groupId];
 
-  if (callerRole !== "superadmin" && !(await isPlatformAdmin(auth.uid))) {
+  if (callerRole !== "superadmin") {
     throw new HttpsError(
       "permission-denied",
       "Only superadmins can manage roles."

@@ -11,7 +11,6 @@ export type Gender = 'male' | 'female' | 'unisex'
 export type Condition = 'new' | 'good' | 'worn' | 'damaged'
 export type TransferType = 'request' | 'admin' | 'scan'
 export type RequestStatus = 'pending' | 'approved' | 'declined' | 'transferred'
-export type SubscriptionStatus = 'active' | 'suspended'
 
 /** holderId sentinel meaning "not currently checked out / available". See CLAUDE.md. */
 export const STORAGE_HOLDER = 'storage'
@@ -21,8 +20,6 @@ export interface Subscription {
   name: string
   ownerUserId: string
   createdAt?: Timestamp
-  planId?: string
-  status?: SubscriptionStatus
 }
 
 export interface Group {
@@ -123,19 +120,4 @@ export interface TransferRequest {
   requestedAt?: Timestamp
   declinedAt?: Timestamp
   transferredAt?: Timestamp
-}
-
-export interface Plan {
-  id: string
-  name: string
-  description?: string
-  priceMonthly?: number
-  maxMembers?: number
-  maxItems?: number
-}
-
-export interface PlatformAdminGrant {
-  id: string
-  grantedAt?: Timestamp
-  grantedBy?: string
 }

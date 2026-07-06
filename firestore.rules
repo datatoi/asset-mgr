@@ -25,20 +25,11 @@ service cloud.firestore {
       return userGroups.values().hasAny(['admin', 'superadmin']);
     }
 
-    // Site-wide operator role - separate from the per-group 'superadmin' role.
-    // Grant is just the existence of this doc (see platformAdmins rule below);
-    // the very first one must be created out-of-band (Console/gcloud), since
-    // nothing inside the app can grant the first Platform Admin.
-    function isPlatformAdmin() {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
-    }
-
     // Collections
 
     match /users/{userId} {
       allow read: if isAuthenticated() &&
-        (request.auth.uid == userId || belongsToSub(resource.data) || isPlatformAdmin());
+        (request.auth.uid == userId || belongsToSub(resource.data));
       // Clients can update their own profile EXCEPT roles (groups map)
       allow update: if isAuthenticated() && request.auth.uid == userId
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['groups', 'subscriptionId']);
@@ -47,89 +38,71 @@ service cloud.firestore {
 
     match /subscriptions/{subId} {
       allow read: if isAuthenticated() &&
-        (resource.data.ownerUserId == request.auth.uid || getUserData().subscriptionId == subId || isPlatformAdmin());
-      // Everyday subscription docs are created via the registerSubscription
-      // Cloud Function (Admin SDK, bypasses rules). Direct client writes are
-      // only for the Platform Admin editing name/status/planId/ownerUserId.
-      allow write: if isPlatformAdmin();
+        (resource.data.ownerUserId == request.auth.uid || getUserData().subscriptionId == subId);
+      // Created via the registerSubscription Cloud Function (Admin SDK,
+      // bypasses rules) - no direct client writes.
+      allow write: if false;
     }
 
     match /groups/{groupId} {
-      allow read: if isAuthenticated() && (belongsToSub(resource.data) || isPlatformAdmin());
-      allow write: if isAuthenticated() && (hasRole(groupId, ['superadmin']) || isPlatformAdmin());
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && hasRole(groupId, ['superadmin']);
     }
 
     match /classes/{id} {
-      allow read: if isAuthenticated() && (belongsToSub(resource.data) || isPlatformAdmin());
-      allow write: if isAuthenticated() && (isAnyAdmin() || isPlatformAdmin());
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && isAnyAdmin();
     }
 
     match /types/{id} {
-      allow read: if isAuthenticated() && (belongsToSub(resource.data) || isPlatformAdmin());
-      allow write: if isAuthenticated() && (isAnyAdmin() || isPlatformAdmin());
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && isAnyAdmin();
     }
 
     match /items/{itemId} {
-      allow read: if isAuthenticated() && (belongsToSub(resource.data) || isPlatformAdmin());
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
       // Admins may create/delete items freely. Updates may not touch holderId
       // (privileged, Cloud-Function-only field) - note resource.data doesn't
       // exist yet on create, so that check must live in a separate update rule.
-      allow create: if isAuthenticated() && (isAnyAdmin() || isPlatformAdmin());
-      allow update: if isAuthenticated() && (isAnyAdmin() || isPlatformAdmin())
+      allow create: if isAuthenticated() && isAnyAdmin();
+      allow update: if isAuthenticated() && isAnyAdmin()
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['holderId', 'subscriptionId']);
-      allow delete: if isAuthenticated() && (isAnyAdmin() || isPlatformAdmin());
+      allow delete: if isAuthenticated() && isAnyAdmin();
 
       match /comments/{commentId} {
         allow read: if isAuthenticated() &&
-          (belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data) || isPlatformAdmin());
+          belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data);
         allow create: if isAuthenticated();
       }
 
       match /holderHistory/{historyId} {
         allow read: if isAuthenticated() &&
-          (belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data) || isPlatformAdmin());
+          belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data);
         allow write: if false; // Managed by Cloud Functions
       }
     }
 
     match /kits/{kitId} {
-      allow read: if isAuthenticated() && (belongsToSub(resource.data) || isPlatformAdmin());
-      allow write: if isAuthenticated() && (isAnyAdmin() || isPlatformAdmin());
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
+      allow write: if isAuthenticated() && isAnyAdmin();
     }
 
     match /requests/{reqId} {
-      allow read: if isAuthenticated() && (belongsToSub(resource.data) || isPlatformAdmin());
+      allow read: if isAuthenticated() && belongsToSub(resource.data);
       allow create: if isAuthenticated();
-      // Clients may only decline a pending request (requester cancelling, the
-      // current holder/admin turning it down, or Platform Admin while
-      // impersonating), changing status+declinedAt and nothing else.
-      // Approval always goes through the transferItem Cloud Function, which
-      // is what actually moves holderId and writes holderHistory - never
-      // allow status to reach 'approved'/'transferred' via a direct write.
+      // Clients may only decline a pending request (requester cancelling, or
+      // the current holder/admin turning it down), changing status+declinedAt
+      // and nothing else. Approval always goes through the transferItem
+      // Cloud Function, which is what actually moves holderId and writes
+      // holderHistory - never allow status to reach 'approved'/'transferred'
+      // via a direct client write.
       allow update: if isAuthenticated() && (
         request.auth.uid == resource.data.requestedByUserId ||
         request.auth.uid == resource.data.currentHolderId ||
-        isAnyAdmin() ||
-        isPlatformAdmin()
+        isAnyAdmin()
       ) && resource.data.status == 'pending'
         && request.resource.data.status == 'declined'
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'declinedAt']);
-    }
-
-    // Platform administration (SaaS operator layer)
-
-    match /platformAdmins/{uid} {
-      // Allowlist itself: only an existing Platform Admin can read/grant/revoke.
-      // The first entry can only be created out-of-band (Console/gcloud).
-      allow read, write: if isPlatformAdmin();
-    }
-
-    match /plans/{planId} {
-      // Plan names/prices aren't sensitive - any authenticated user can read
-      // them (e.g. to show a subscription's current plan). Only Platform
-      // Admin defines/edits plans.
-      allow read: if isAuthenticated();
-      allow write: if isPlatformAdmin();
     }
   }
 }
