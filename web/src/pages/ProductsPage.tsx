@@ -4,68 +4,68 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
-import type { AssetClass, ItemType } from '../types/models';
+import type { Category, Product } from '../types/models';
 
-const TypesPage: React.FC = () => {
+const ProductsPage: React.FC = () => {
   const { userData } = useAuth();
-  const [types, setTypes] = useState<ItemType[]>([]);
-  const [classes, setClasses] = useState<AssetClass[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingType, setEditingType] = useState<ItemType | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
 
-    // Sync Types
-    const qTypes = query(
-      collection(db, 'types'),
+    // Sync Products
+    const qProducts = query(
+      collection(db, 'products'),
       where('subscriptionId', '==', userData.subscriptionId)
     );
-    const unsubTypes = onSnapshot(qTypes, (snapshot) => {
-      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ItemType)));
+    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });
 
-    // Sync Classes for the dropdown
-    const qClasses = query(
-      collection(db, 'classes'),
+    // Sync Categories for the dropdown
+    const qCategories = query(
+      collection(db, 'categories'),
       where('subscriptionId', '==', userData.subscriptionId)
     );
-    const unsubClasses = onSnapshot(qClasses, (snapshot) => {
-      setClasses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AssetClass)));
+    const unsubCategories = onSnapshot(qCategories, (snapshot) => {
+      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
     });
 
     return () => {
-      unsubTypes();
-      unsubClasses();
+      unsubProducts();
+      unsubCategories();
     };
   }, [userData]);
 
   const handleAdd = () => {
-    setEditingType(null);
+    setEditingProduct(null);
     form.resetFields();
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: ItemType) => {
-    setEditingType(record);
+  const handleEdit = (record: Product) => {
+    setEditingProduct(record);
     form.setFieldsValue(record);
     setIsModalOpen(true);
   };
 
-  const onFinish = async (values: Pick<ItemType, 'name' | 'classId' | 'gender' | 'imageUrl'>) => {
+  const onFinish = async (values: Pick<Product, 'name' | 'categoryId' | 'gender' | 'imageUrl'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = {
         ...values,
         subscriptionId: userData.subscriptionId,
       };
-      if (editingType) {
-        await updateDoc(doc(db, 'types', editingType.id), data);
-        message.success('Type updated');
+      if (editingProduct) {
+        await updateDoc(doc(db, 'products', editingProduct.id), data);
+        message.success('Product updated');
       } else {
-        await addDoc(collection(db, 'types'), data);
-        message.success('Type created');
+        await addDoc(collection(db, 'products'), data);
+        message.success('Product created');
       }
       setIsModalOpen(false);
     } catch (err) {
@@ -78,14 +78,14 @@ const TypesPage: React.FC = () => {
       title: 'Image',
       dataIndex: 'imageUrl',
       key: 'imageUrl',
-      render: (url: string) => url ? <img src={url} alt="type" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : 'No image'
+      render: (url: string) => url ? <img src={url} alt="product" style={{ width: 50, height: 50, objectFit: 'cover' }} /> : 'No image'
     },
     { title: 'Name', dataIndex: 'name', key: 'name' },
     {
-      title: 'Class',
-      dataIndex: 'classId',
-      key: 'classId',
-      render: (id: string) => classes.find(c => c.id === id)?.name || 'Unknown'
+      title: 'Category',
+      dataIndex: 'categoryId',
+      key: 'categoryId',
+      render: (id: string) => categories.find(c => c.id === id)?.name || 'Unknown'
     },
     {
       title: 'Gender',
@@ -96,10 +96,10 @@ const TypesPage: React.FC = () => {
     {
       title: 'Action',
       key: 'action',
-      render: (_: unknown, record: ItemType) => (
+      render: (_: unknown, record: Product) => (
         <Space size="middle">
           <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
-          <Popconfirm title="Sure to delete?" onConfirm={() => deleteDoc(doc(db, 'types', record.id))}>
+          <Popconfirm title="Sure to delete?" onConfirm={() => deleteDoc(doc(db, 'products', record.id))}>
             <Button type="link" danger>Delete</Button>
           </Popconfirm>
         </Space>
@@ -110,32 +110,32 @@ const TypesPage: React.FC = () => {
   return (
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>Asset Types</h2>
-        <Button type="primary" onClick={handleAdd}>Add Type</Button>
+        <h2>Products</h2>
+        <Button type="primary" onClick={handleAdd}>Add Product</Button>
       </div>
-      <Table dataSource={types} columns={columns} rowKey="id" />
+      <Table dataSource={products} columns={columns} rowKey="id" />
 
       <Modal
-        title={editingType ? "Edit Type" : "Add Type"}
+        title={editingProduct ? "Edit Product" : "Add Product"}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         onOk={() => form.submit()}
         width={600}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item name="imageUrl" label="Type Image">
-            <ImageUpload folder="types" />
+          <Form.Item name="imageUrl" label="Product Image">
+            <ImageUpload folder="products" />
           </Form.Item>
           <Form.Item
             name="name"
-            label="Type Name"
+            label="Product Name"
             rules={[{ required: true }]}
           >
             <Input placeholder="e.g. Red Floral Skirt" />
           </Form.Item>
-          <Form.Item name="classId" label="Class" rules={[{ required: true }]}>
-            <Select placeholder="Select Class">
-              {classes.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
+          <Form.Item name="categoryId" label="Category" rules={[{ required: true }]}>
+            <Select placeholder="Select Category">
+              {categories.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
             </Select>
           </Form.Item>
           <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
@@ -151,4 +151,4 @@ const TypesPage: React.FC = () => {
   );
 };
 
-export default TypesPage;
+export default ProductsPage;

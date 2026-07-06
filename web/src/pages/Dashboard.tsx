@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Col, Row, Select, Input, Tag, Empty, Badge, Space, Typography } from 'antd';
+import { Card, Col, Row, Select, Input, Tag, Empty, Badge, Space, Typography, Button, message } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { SearchOutlined } from '@ant-design/icons';
-import type { AssetClass, Item, ItemType } from '../types/models';
+import { SearchOutlined, CopyOutlined, LinkOutlined } from '@ant-design/icons';
+import type { Category, Item, Product } from '../types/models';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -14,9 +14,23 @@ const Dashboard: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
-  const [types, setTypes] = useState<ItemType[]>([]);
-  const [classes, setClasses] = useState<AssetClass[]>([]);
-  const [filters, setFilters] = useState({ typeId: '', classId: '', size: '', search: '' });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [filters, setFilters] = useState({ productId: '', categoryId: '', size: '', search: '' });
+
+  const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+  const inviteLink = userData?.subscriptionId
+    ? `${window.location.origin}/join/${userData.subscriptionId}`
+    : '';
+
+  const handleCopyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteLink);
+      message.success('Invite link copied to clipboard');
+    } catch {
+      message.error('Could not copy automatically — copy it manually instead');
+    }
+  };
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
@@ -24,66 +38,77 @@ const Dashboard: React.FC = () => {
     const qItems = query(collection(db, 'items'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubItems = onSnapshot(qItems, (snap) => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Item))));
 
-    const qTypes = query(collection(db, 'types'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubTypes = onSnapshot(qTypes, (snap) => setTypes(snap.docs.map(d => ({ id: d.id, ...d.data() } as ItemType))));
+    const qProducts = query(collection(db, 'products'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubProducts = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product))));
 
-    const qClasses = query(collection(db, 'classes'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubClasses = onSnapshot(qClasses, (snap) => setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() } as AssetClass))));
+    const qCategories = query(collection(db, 'categories'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubCategories = onSnapshot(qCategories, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category))));
 
-    return () => { unsubItems(); unsubTypes(); unsubClasses(); };
+    return () => { unsubItems(); unsubProducts(); unsubCategories(); };
   }, [userData]);
 
   const filteredItems = items.filter(item => {
-    const matchesType = !filters.typeId || item.typeId === filters.typeId;
-    const type = types.find(t => t.id === item.typeId);
-    const matchesClass = !filters.classId || type?.classId === filters.classId;
+    const matchesProduct = !filters.productId || item.productId === filters.productId;
+    const product = products.find(p => p.id === item.productId);
+    const matchesCategory = !filters.categoryId || product?.categoryId === filters.categoryId;
     const matchesSize = !filters.size || item.size?.toLowerCase().includes(filters.size.toLowerCase());
-    const matchesSearch = !filters.search || type?.name?.toLowerCase().includes(filters.search.toLowerCase());
-    return matchesType && matchesClass && matchesSize && matchesSearch;
+    const matchesSearch = !filters.search || product?.name?.toLowerCase().includes(filters.search.toLowerCase());
+    return matchesProduct && matchesCategory && matchesSize && matchesSearch;
   });
 
   return (
     <div style={{ padding: 24 }}>
+      {isAdmin && (
+        <Card size="small" style={{ marginBottom: 24 }}>
+          <Space wrap>
+            <LinkOutlined />
+            <Text strong>Invite link:</Text>
+            <Text code copyable={false} style={{ maxWidth: 400 }} ellipsis>{inviteLink}</Text>
+            <Button size="small" icon={<CopyOutlined />} onClick={handleCopyInvite}>Copy</Button>
+            <Text type="secondary">New members joining via this link get the "user" role — promote them from Members.</Text>
+          </Space>
+        </Card>
+      )}
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={2}>Inventory Dashboard</Title>
         <Space>
-          <Input 
-            placeholder="Search items..." 
-            prefix={<SearchOutlined />} 
-            onChange={e => setFilters({ ...filters, search: e.target.value })} 
+          <Input
+            placeholder="Search items..."
+            prefix={<SearchOutlined />}
+            onChange={e => setFilters({ ...filters, search: e.target.value })}
             style={{ width: 250 }}
           />
-          <Select 
-            placeholder="Class" 
-            allowClear 
+          <Select
+            placeholder="Category"
+            allowClear
             style={{ width: 150 }}
-            onChange={val => setFilters({ ...filters, classId: val })}
+            onChange={val => setFilters({ ...filters, categoryId: val })}
           >
-            {classes.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+            {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
           </Select>
-          <Select 
-            placeholder="Type" 
-            allowClear 
+          <Select
+            placeholder="Product"
+            allowClear
             style={{ width: 150 }}
-            onChange={val => setFilters({ ...filters, typeId: val })}
+            onChange={val => setFilters({ ...filters, productId: val })}
           >
-            {types.map(t => <Option key={t.id} value={t.id}>{t.name}</Option>)}
+            {products.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
           </Select>
         </Space>
       </div>
 
       <Row gutter={[16, 16]}>
         {filteredItems.length > 0 ? filteredItems.map(item => {
-          const type = types.find(t => t.id === item.typeId);
+          const product = products.find(p => p.id === item.productId);
           return (
             <Col xs={24} sm={12} md={8} lg={6} key={item.id}>
               <Card
                 hoverable
-                cover={<img alt={type?.name} src={item.imageUrl || type?.imageUrl} style={{ height: 200, objectFit: 'cover' }} />}
+                cover={<img alt={product?.name} src={item.imageUrl || product?.imageUrl} style={{ height: 200, objectFit: 'cover' }} />}
                 onClick={() => navigate(`/items/${item.id}`)}
               >
-                <Card.Meta 
-                  title={type?.name || 'Unknown Item'}
+                <Card.Meta
+                  title={product?.name || 'Unknown Item'}
                   description={
                     <Space direction="vertical" style={{ width: '100%' }}>
                       <Space split={<Text type="secondary">|</Text>}>

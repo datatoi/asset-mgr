@@ -24,9 +24,9 @@ hosted-SaaS billing/operator model.
 ## Architecture — two surfaces, one backend
 
 1. **Web app** (management-heavy): React + Ant Design + Firebase client SDKs.
-   Handles subscription setup, catalog management (classes/types/items/kits),
-   member management, browsing/filtering, comments, history, requests, and holder
-   transfers. Hosted on Firebase Hosting.
+   Handles subscription setup, catalog management (categories/products/items/
+   kits), member management, browsing/filtering, comments, history, requests,
+   and holder transfers. Hosted on Firebase Hosting.
 
 2. **Mobile NFC scanner** (thin, single-purpose): React Native with
    `react-native-nfc-manager`. Tap a garment's NFC tag → resolve the item →
@@ -63,31 +63,43 @@ hosted-SaaS billing/operator model.
 
 ## Data model (Firestore)
 
-Catalog hierarchy: **Class → Type → Item**, plus **Kit** (checkout unit).
+Catalog hierarchy: **Category → Product → Item**, plus **Kit** (checkout unit).
 
 - `subscriptions/{subId}` — `ownerUserId`, `name`, `createdAt`
 - `groups/{groupId}` — `subscriptionId`, `name`, `description`, `createdAt`
 - `users/{uid}` — `subscriptionId`, `name`, `email`, `avatarUrl`,
-  `groups` (map: `{ groupId: 'superadmin'|'admin'|'user' }`), `size`, `gender`
-- `classes/{classId}` — `subscriptionId`, `groupId`, `name`  (e.g. dress, shoes)
-- `types/{typeId}` — `subscriptionId`, `groupId`, `classId`, `name`, `gender`,
-  `imageUrl`  (e.g. "red dress")
-- `items/{itemId}` — `subscriptionId`, `groupId`, `typeId`, `size`, `gender`,
+  `groups` (map: `{ groupId: 'superadmin'|'admin'|'user' }`), `gender`,
+  `sizes` (map: `{ categoryId: sizeString }` — **per-category**, since a shoe
+  size and a dress size aren't the same scale)
+- `categories/{categoryId}` — `subscriptionId`, `groupId`, `name`  (e.g. dress, shoes)
+- `products/{productId}` — `subscriptionId`, `groupId`, `categoryId`, `name`,
+  `gender`, `imageUrl`  (e.g. "red dress")
+- `items/{itemId}` — `subscriptionId`, `groupId`, `productId`, `size`, `gender`,
   `condition`, `imageUrl`, `rfidTag`, `ownerId`, `holderId`, `createdAt`, `updatedAt`
   - subcollection `comments/{id}` — `userId`, `text`, `timestamp`
   - subcollection `holderHistory/{id}` — `previousHolderId`, `newHolderId`,
     `transferDate`, `initiatedByUserId`, `transferType` (`request` | `admin` | `scan`)
-- `kits/{kitId}` — `subscriptionId`, `groupId`, `name`, `gender`, `size`,
-  `typeIds` (the specific Types a complete kit requires — one of each — not
-  Classes; e.g. "Red Dress" + "Black Shoes", not "Dress" + "Shoes"),
-  `description`
+- `kits/{kitId}` — `subscriptionId`, `groupId`, `name`, `gender`,
+  `productIds` (the specific Products a complete kit requires — one of each —
+  not Categories; e.g. "Red Dress" + "Black Shoes", not "Dress" + "Shoes"),
+  `description` — no flat `size` field; fulfillment matches per-category
+  against the requester's `sizes` map (see Kit request / checkout below)
 - `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
   `currentHolderId`, `status` (`pending`|`approved`|`declined`|`transferred`),
   `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`
 
 ### Owner vs Holder
 Both are **people**. `ownerId` = long-term assigned person; `holderId` = who
-physically has it right now. **History tracks holder changes** (`holderHistory`).
+physically has it right now. **History tracks holder changes** (`holderHistory`)
+— owner changes are plain metadata, not audited.
+
+Both are editable by `admin`/`superadmin` on `ItemDetail` via dropdowns. They
+go through different paths: **holder** always calls the `transferItem` Cloud
+Function (`transferType: 'admin'`, no `requestId`) so it's logged to
+`holderHistory` the same as a request-approval transfer; **owner** is a plain
+direct `updateDoc` (allowed by rules — only `holderId`/`subscriptionId` are
+blocked from direct client writes on `items`), since it's not part of the
+checkout workflow and doesn't need an audit trail.
 
 `holderId` uses the sentinel value **`"storage"`** to mean "not currently
 checked out / available" (rather than null or a separate `available` boolean).
@@ -96,10 +108,22 @@ available items.
 
 ## Key workflows
 - **Onboarding**: Google login → create Subscription (owner) → create Group(s) →
-  build catalog (classes → types → items, with photos + NFC tags) → invite members.
-- **Kit request / checkout**: user requests a kit → backend **auto-picks available
-  items** of each required type matching the user's **size/gender**, fails
-  gracefully if a type has none available → generates per-item requests.
+  build catalog (categories → products → items, with photos + NFC tags) → invite members.
+- **Invite link**: `/join/{subscriptionId}`, shown with a copy button on the
+  Dashboard for admins. Visiting it (after signing in) calls the
+  `joinSubscription` Cloud Function, which adds the caller as `'user'` in
+  every group of that subscription — an admin promotes them afterward via
+  `MembersPage`/`assignRole`. Rejects if the caller already belongs to a
+  subscription. Like `registerSubscription`, this must go through a Cloud
+  Function: `firestore.rules` blocks `users.subscriptionId`/`groups` from
+  being set directly by the client, on both `create` and `update` (see
+  Authorization principles) — otherwise anyone could self-grant a role in any
+  group just by knowing its ID.
+- **Kit request / checkout**: user requests a kit → backend resolves each
+  required product's category, looks up the requester's `sizes[categoryId]`
+  (rejecting with a clear error if not set), then **auto-picks an available
+  item** of that product matching that size and the user's **gender**, fails
+  gracefully if none available → generates per-item requests.
 - **Approval**: current holder (or admin) approves/declines. On approval, backend
   updates `holderId`, appends `holderHistory`, marks request `transferred`.
 - **Admin transfer**: admin/superadmin changes `holderId` directly; backend logs it.
@@ -111,6 +135,10 @@ available items.
 - Any authenticated user may add `comments` and create `requests`.
 - **All holder/role changes go through Cloud Functions** — never trust client-side
   writes for these, even during early iteration.
+- **`users.subscriptionId`/`groups` can never be set by a direct client
+  write** — blocked on both `create` and `update` in `firestore.rules`.
+  Joining a subscription (registration or invite link) always goes through
+  `registerSubscription`/`joinSubscription` (Admin SDK, bypasses rules).
 
 ## Status
 Core web app scaffolded and functional (Firebase project, auth, subscription

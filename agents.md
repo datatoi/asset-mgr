@@ -27,7 +27,7 @@ transfers between people.
 *   **Backend**: Firebase Cloud Functions 2.0 (Node.js) for all privileged writes.
 *   **Database**: Cloud Firestore.
 *   **Authentication**: Firebase Authentication (Google Login).
-*   **File Storage**: Cloud Storage for Firebase (type images, item images, avatars).
+*   **File Storage**: Cloud Storage for Firebase (product images, item images, avatars).
 *   **Authorization**: Firebase Security Rules based on per-group roles in Firestore.
 
 ### NFC conventions
@@ -47,19 +47,22 @@ transfers between people.
 *   Every tenant-scoped document carries a `subscriptionId`.
 
 ## Catalog hierarchy
-**Class → Type → Item**, plus **Kit** as the checkout unit.
-*   **Class** — broad category (dress, shoes, trousers, shirt, boots).
-*   **Type** — specific variant with a picture ("red dress", "black shoes").
-    Belongs to a class; has a gender.
+**Category → Product → Item**, plus **Kit** as the checkout unit.
+*   **Category** — broad grouping (dress, shoes, trousers, shirt, boots).
+*   **Product** — specific variant with a picture ("red dress", "black shoes").
+    Belongs to a category; has a gender.
 *   **Item** — the physical garment. Has a picture, an **NFC RFID tag**, size,
-    gender, condition. Belongs to a type. Has an **owner** and a **holder**.
+    gender, condition. Belongs to a product. Has an **owner** and a **holder**.
 *   **Kit** — a complete outfit set (male/female) made of one item per required
-    **type** (not class — a kit needs a specific "Red Dress", not just any
-    "Dress"). This is what a member checks out. Limited quantity drives booking.
+    **product** (not category — a kit needs a specific "Red Dress", not just
+    any "Dress"). This is what a member checks out. Limited quantity drives
+    booking.
 
 ### Owner vs Holder
 Both are **people**. `ownerId` = long-term assigned person; `holderId` = who
-physically has the item right now. **History tracks holder changes.**
+physically has the item right now. **History tracks holder changes** — owner
+changes are plain metadata, not audited. Both are editable via dropdown by
+admin/superadmin on the Item Detail view.
 
 ## Frontend (Web) Requirements
 
@@ -73,25 +76,31 @@ physically has the item right now. **History tracks holder changes.**
     created for them as owner; they then create groups and invite users.
 
 3.  **Dashboard / Main View** (all authenticated users) — list all items; filter by
-    holder, owner, group, class, type.
+    holder, owner, group, category, product.
 
-4.  **Item Detail View** (all authenticated users) — all properties (type, class,
-    size, gender, condition, description, image), current owner and holder.
+4.  **Item Detail View** (all authenticated users) — all properties (product,
+    category, size, gender, condition, description, image), current owner and holder.
     *   **Tab: Comments** — list existing; form for any user to add one.
     *   **Tab: Holder History** — chronological past holders + transfer dates,
         including who initiated the change (if admin/superadmin).
     *   **Request Item / Kit Button** — a regular user requests an item, or a kit
         (which auto-generates individual item requests, see backend).
 
-5.  **User Profile / Settings** — edit own size/gender; view/change avatar (Cloud
-    Storage upload).
+5.  **User Profile / Settings** — edit own gender; set **size per category**
+    (a shoe size and a dress size aren't the same scale, so one size input
+    per category defined in the subscription, not one flat size field);
+    view/change avatar (Cloud Storage upload).
 
 6.  **Admin Management Forms** (admin/superadmin roles):
-    *   Classes management (create/edit/delete).
-    *   Types management (create/edit/delete, with image).
+    *   Categories management (create/edit/delete).
+    *   Products management (create/edit/delete, with image).
     *   Items management (create/edit/delete, with image + RFID tag).
-    *   Kits management (create/edit/delete; required types, gender, size).
+    *   Kits management (create/edit/delete; required products, gender, size).
     *   Members management (edit member properties; assign per-group roles).
+    *   **Invite link** (`/join/{subscriptionId}`) — shown with a copy button
+        on the Dashboard; anyone who visits it and signs in joins as a plain
+        `user` in every group of the subscription, promoted afterward via
+        Members management.
     *   **Transfer window** — regular users: approve/decline receive/hand-over
         requests; admins/superadmins: directly change an item's holder with an
         automatic holder-history log (who, when).
@@ -105,8 +114,8 @@ physically has the item right now. **History tracks holder changes.**
 
 **Functionality:**
 *   **Kit request auto-fulfillment** — when a user requests a kit, auto-pick one
-    **available item of each required type** matching the requester's size/gender;
-    fail gracefully if a type has nothing available; create the per-item requests.
+    **available item of each required product** matching the requester's size/gender;
+    fail gracefully if a product has nothing available; create the per-item requests.
 *   **Request processing** — handle approval/decline by the current holder (or
     admin). On approval: update `holderId`, append a `holderHistory` entry, mark
     the request `transferred`.
@@ -116,6 +125,9 @@ physically has the item right now. **History tracks holder changes.**
     callable by a superadmin for that group.
 *   **Subscription/group setup** — initialize a subscription for a new owner and
     the first group.
+*   **Invite link join** — add the caller as `'user'` in every group of an
+    existing subscription via its invite link; rejects if the caller already
+    belongs to a subscription or the link is invalid.
 
 **Implementation Details:**
 *   Trigger via callable/HTTP requests from the frontend and Firestore triggers as
@@ -131,10 +143,10 @@ physically has the item right now. **History tracks holder changes.**
 *   `users/{uid}` (doc ID = Firebase Auth UID) — `subscriptionId`, `name`, `email`,
     `avatarUrl`, `groups` (map `{ groupId: 'superadmin'|'admin'|'user' }`),
     `size`, `gender`.
-*   `classes/{classId}` — `subscriptionId`, `groupId`, `name`.
-*   `types/{typeId}` — `subscriptionId`, `groupId`, `classId`, `name`, `gender`,
-    `imageUrl`.
-*   `items/{itemId}` — `subscriptionId`, `groupId`, `typeId`, `size`, `gender`,
+*   `categories/{categoryId}` — `subscriptionId`, `groupId`, `name`.
+*   `products/{productId}` — `subscriptionId`, `groupId`, `categoryId`, `name`,
+    `gender`, `imageUrl`.
+*   `items/{itemId}` — `subscriptionId`, `groupId`, `productId`, `size`, `gender`,
     `condition`, `imageUrl`, `rfidTag`, `ownerId`, `holderId`, `createdAt`,
     `updatedAt`.
     *   Subcollection `comments/{id}` — `userId`, `text`, `timestamp`.
@@ -142,8 +154,8 @@ physically has the item right now. **History tracks holder changes.**
         `transferDate`, `initiatedByUserId`, `transferType`
         (`request` | `admin` | `scan`).
 *   `kits/{kitId}` — `subscriptionId`, `groupId`, `name`, `gender`, `size`,
-    `typeIds` (the specific Types a complete kit requires — one of each — not
-    Classes), `description`.
+    `productIds` (the specific Products a complete kit requires — one of each —
+    not Categories), `description`.
 *   `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
     `currentHolderId`, `status` (`pending`|`approved`|`declined`|`transferred`),
     `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`.
@@ -153,14 +165,18 @@ physically has the item right now. **History tracks holder changes.**
 **Authentication:** Firebase Authentication — Google Sign-in.
 
 **Authorization (Firestore Security Rules):**
-*   Authenticated users can **read** catalog data (classes, types, items, kits,
-    comments, holderHistory) within their subscription.
+*   Authenticated users can **read** catalog data (categories, products, items,
+    kits, comments, holderHistory) within their subscription.
 *   Only `admin`/`superadmin` (per group) can **write** catalog collections
-    (classes, types, items, kits, groups).
+    (categories, products, items, kits, groups).
 *   Any authenticated user can create `comments` on an item and create `requests`.
 *   Privileged writes (holder/role changes) are performed by Cloud Functions and
     allowed only from the trusted service account.
 *   Users can only update their own `users` profile data.
+*   `users.subscriptionId`/`groups` can never be set directly by the client,
+    on either `create` or `update` — otherwise anyone could self-grant a role
+    in any group just by knowing its ID. Joining a subscription (registration
+    or invite link) always goes through a Cloud Function.
 
 ## Mobile NFC Scanner Requirements
 *   React Native app (Expo dev build or bare) sharing the same Firebase project and
@@ -172,7 +188,7 @@ physically has the item right now. **History tracks holder changes.**
 *   Requires physical iOS/Android devices to test (NFC needs real hardware).
 
 ## File Storage (Cloud Storage)
-*   Store type images, item images, and user avatars.
+*   Store product images, item images, and user avatars.
 *   Rules: authenticated read; scoped upload/delete (item images by admins; avatars
     by the owning user).
 

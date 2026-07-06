@@ -14,10 +14,11 @@ import { useAuth } from './auth/AuthContext';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import RegisterPage from './pages/RegisterPage';
+import JoinPage from './pages/JoinPage';
 import ItemsPage from './pages/ItemsPage';
 import ItemDetail from './pages/ItemDetail';
-import ClassesPage from './pages/ClassesPage';
-import TypesPage from './pages/TypesPage';
+import CategoriesPage from './pages/CategoriesPage';
+import ProductsPage from './pages/ProductsPage';
 import KitsPage from './pages/KitsPage';
 import ProfilePage from './pages/ProfilePage';
 import RequestInbox from './pages/RequestInbox';
@@ -35,15 +36,15 @@ const App: React.FC = () => {
   const menuItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/items', icon: <SkinOutlined />, label: 'Items' },
-    { key: '/classes', icon: <GroupOutlined />, label: 'Classes' },
-    { key: '/types', icon: <TagsOutlined />, label: 'Types' },
+    { key: '/categories', icon: <GroupOutlined />, label: 'Categories' },
+    { key: '/products', icon: <TagsOutlined />, label: 'Products' },
     { key: '/kits', icon: <InboxOutlined />, label: 'Kits' },
     { key: '/requests', icon: <InboxOutlined />, label: 'Requests' },
     ...(isAdmin ? [{ key: '/members', icon: <UserOutlined />, label: 'Members' }] : []),
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
   ];
 
-  const showSider = !['/login', '/register'].includes(location.pathname);
+  const showSider = !['/login', '/register'].includes(location.pathname) && !location.pathname.startsWith('/join/');
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -67,11 +68,12 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/join/:subscriptionId" element={<JoinPage />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
             <Route path="/items/:id" element={<ProtectedRoute><ItemDetail /></ProtectedRoute>} />
-            <Route path="/classes" element={<ProtectedRoute><ClassesPage /></ProtectedRoute>} />
-            <Route path="/types" element={<ProtectedRoute><TypesPage /></ProtectedRoute>} />
+            <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+            <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
             <Route path="/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
             <Route path="/requests" element={<ProtectedRoute><RequestInbox /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />

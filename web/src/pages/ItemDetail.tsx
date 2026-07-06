@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { doc, onSnapshot, collection, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message } from 'antd';
+import { doc, onSnapshot, collection, query, orderBy, addDoc, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../lib/firebase';
+import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select } from 'antd';
 import { useAuth } from '../auth/AuthContext';
-import type { HolderHistoryEntry, Item, ItemComment } from '../types/models';
+import type { HolderHistoryEntry, Item, ItemComment, UserProfile } from '../types/models';
 
 const { Title, Text } = Typography;
 
@@ -14,8 +15,10 @@ const ItemDetail: React.FC = () => {
   const [item, setItem] = useState<Item | null>(null);
   const [comments, setComments] = useState<ItemComment[]>([]);
   const [history, setHistory] = useState<HolderHistoryEntry[]>([]);
+  const [members, setMembers] = useState<UserProfile[]>([]);
   const [newComment, setNewComment] = useState('');
   const [requesting, setRequesting] = useState(false);
+  const [changingHolder, setChangingHolder] = useState(false);
 
   const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
 
@@ -31,6 +34,15 @@ const ItemDetail: React.FC = () => {
 
     return () => { unsubItem(); unsubComments(); unsubHistory(); };
   }, [id]);
+
+  useEffect(() => {
+    if (!isAdmin || !userData?.subscriptionId) return;
+    const q = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
+    });
+    return () => unsubscribe();
+  }, [isAdmin, userData?.subscriptionId]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !id || !user) return;
@@ -65,12 +77,38 @@ const ItemDetail: React.FC = () => {
     }
   };
 
+  const handleChangeHolder = async (newHolderId: string) => {
+    if (!id) return;
+    setChangingHolder(true);
+    try {
+      const transferItemFn = httpsCallable(functions, 'transferItem');
+      await transferItemFn({ itemId: id, newHolderId, transferType: 'admin' });
+      message.success('Holder updated');
+    } catch (err) {
+      message.error('Failed to update holder: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setChangingHolder(false);
+    }
+  };
+
+  const handleChangeOwner = async (newOwnerId: string | null) => {
+    if (!id) return;
+    try {
+      await updateDoc(doc(db, 'items', id), { ownerId: newOwnerId });
+      message.success('Owner updated');
+    } catch (err) {
+      message.error('Failed to update owner: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   if (!item) return null;
+
+  const memberName = (uid?: string) => uid ? (members.find(m => m.id === uid)?.name || uid) : 'Unassigned';
 
   const historyColumns = [
     { title: 'Date', dataIndex: 'transferDate', render: (d: HolderHistoryEntry['transferDate']) => d?.toDate().toLocaleString() },
-    { title: 'From', dataIndex: 'previousHolderId' },
-    { title: 'To', dataIndex: 'newHolderId' },
+    { title: 'From', dataIndex: 'previousHolderId', render: (uid: string) => uid === 'storage' ? 'Storage' : memberName(uid) },
+    { title: 'To', dataIndex: 'newHolderId', render: (uid: string) => uid === 'storage' ? 'Storage' : memberName(uid) },
     { title: 'Type', dataIndex: 'transferType', render: (t: string) => <Tag>{t.toUpperCase()}</Tag> }
   ];
 
@@ -101,7 +139,34 @@ const ItemDetail: React.FC = () => {
               <Descriptions.Item label="Size">{item.size}</Descriptions.Item>
               <Descriptions.Item label="Condition"><Tag color="orange">{item.condition?.toUpperCase()}</Tag></Descriptions.Item>
               <Descriptions.Item label="Current Holder">
-                <Text strong>{item.holderId === 'storage' ? 'STORAGE' : item.holderId}</Text>
+                {isAdmin ? (
+                  <Select
+                    value={item.holderId}
+                    style={{ width: 240 }}
+                    loading={changingHolder}
+                    onChange={handleChangeHolder}
+                  >
+                    <Select.Option value="storage">Storage (Available)</Select.Option>
+                    {members.map(m => <Select.Option key={m.id} value={m.id}>{m.name}</Select.Option>)}
+                  </Select>
+                ) : (
+                  <Text strong>{item.holderId === 'storage' ? 'STORAGE' : memberName(item.holderId)}</Text>
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="Owner">
+                {isAdmin ? (
+                  <Select
+                    value={item.ownerId}
+                    placeholder="Unassigned"
+                    allowClear
+                    style={{ width: 240 }}
+                    onChange={(value) => handleChangeOwner(value ?? null)}
+                  >
+                    {members.map(m => <Select.Option key={m.id} value={m.id}>{m.name}</Select.Option>)}
+                  </Select>
+                ) : (
+                  <Text strong>{memberName(item.ownerId)}</Text>
+                )}
               </Descriptions.Item>
             </Descriptions>
 

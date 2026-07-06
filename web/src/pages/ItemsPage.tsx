@@ -4,12 +4,12 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
-import type { Item, ItemType } from '../types/models';
+import type { Item, Product } from '../types/models';
 
 const ItemsPage: React.FC = () => {
   const { userData } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
-  const [types, setTypes] = useState<ItemType[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
@@ -22,15 +22,15 @@ const ItemsPage: React.FC = () => {
       setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Item)));
     });
 
-    const qTypes = query(collection(db, 'types'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubTypes = onSnapshot(qTypes, (snapshot) => {
-      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ItemType)));
+    const qProducts = query(collection(db, 'products'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });
 
-    return () => { unsubItems(); unsubTypes(); };
+    return () => { unsubItems(); unsubProducts(); };
   }, [userData]);
 
-  const onFinish = async (values: Pick<Item, 'typeId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl'>) => {
+  const onFinish = async (values: Pick<Item, 'productId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = {
@@ -62,9 +62,9 @@ const ItemsPage: React.FC = () => {
       render: (url: string) => <img src={url} alt="item" style={{ width: 40, height: 40, borderRadius: 4 }} />
     },
     {
-      title: 'Type',
-      dataIndex: 'typeId',
-      render: (id: string) => types.find(t => t.id === id)?.name || 'Unknown'
+      title: 'Product',
+      dataIndex: 'productId',
+      render: (id: string) => products.find(p => p.id === id)?.name || 'Unknown'
     },
     { title: 'Size', dataIndex: 'size' },
     {
@@ -103,9 +103,9 @@ const ItemsPage: React.FC = () => {
           <Space align="start" size="large">
             <Form.Item name="imageUrl" label="Item Image"><ImageUpload folder="items" /></Form.Item>
             <div style={{ flex: 1, minWidth: 400 }}>
-              <Form.Item name="typeId" label="Type" rules={[{ required: true }]}>
+              <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
                 <Select showSearch optionFilterProp="children">
-                  {types.map(t => <Select.Option key={t.id} value={t.id}>{t.name} ({t.gender})</Select.Option>)}
+                  {products.map(p => <Select.Option key={p.id} value={p.id}>{p.name} ({p.gender})</Select.Option>)}
                 </Select>
               </Form.Item>
               <Space>

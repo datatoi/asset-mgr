@@ -4,12 +4,12 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db, functions } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { httpsCallable } from 'firebase/functions';
-import type { Kit, ItemType } from '../types/models';
+import type { Kit, Product } from '../types/models';
 
 const KitsPage: React.FC = () => {
   const { userData } = useAuth();
   const [kits, setKits] = useState<Kit[]>([]);
-  const [types, setTypes] = useState<ItemType[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKit, setEditingKit] = useState<Kit | null>(null);
   const [requestLoading, setRequestLoading] = useState<string | null>(null);
@@ -25,12 +25,12 @@ const KitsPage: React.FC = () => {
       setKits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kit)));
     });
 
-    const qTypes = query(collection(db, 'types'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubTypes = onSnapshot(qTypes, (snapshot) => {
-      setTypes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ItemType)));
+    const qProducts = query(collection(db, 'products'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubProducts = onSnapshot(qProducts, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });
 
-    return () => { unsubKits(); unsubTypes(); };
+    return () => { unsubKits(); unsubProducts(); };
   }, [userData]);
 
   const handleRequest = async (kitId: string) => {
@@ -46,7 +46,7 @@ const KitsPage: React.FC = () => {
     }
   };
 
-  const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'typeIds' | 'description'>) => {
+  const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'productIds' | 'description'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = { ...values, subscriptionId: userData.subscriptionId };
@@ -67,11 +67,11 @@ const KitsPage: React.FC = () => {
     { title: 'Kit Name', dataIndex: 'name' },
     { title: 'Gender', dataIndex: 'gender', render: (g: string) => <Tag>{g?.toUpperCase()}</Tag> },
     {
-      title: 'Required Types',
-      dataIndex: 'typeIds',
+      title: 'Required Products',
+      dataIndex: 'productIds',
       render: (ids: string[]) => ids?.map(id => {
-        const typeName = types.find(t => t.id === id)?.name;
-        return <Tag key={id} color="blue">{typeName}</Tag>;
+        const productName = products.find(p => p.id === id)?.name;
+        return <Tag key={id} color="blue">{productName}</Tag>;
       })
     },
     {
@@ -111,9 +111,9 @@ const KitsPage: React.FC = () => {
           <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
             <Select><Select.Option value="male">Male</Select.Option><Select.Option value="female">Female</Select.Option></Select>
           </Form.Item>
-          <Form.Item name="typeIds" label="Required Types" rules={[{ required: true }]}>
+          <Form.Item name="productIds" label="Required Products" rules={[{ required: true }]}>
             <Select mode="multiple" placeholder="Select what makes this kit complete">
-              {types.map(t => <Select.Option key={t.id} value={t.id}>{t.name}</Select.Option>)}
+              {products.map(p => <Select.Option key={p.id} value={p.id}>{p.name}</Select.Option>)}
             </Select>
           </Form.Item>
           <Form.Item name="description" label="Description"><Input.TextArea /></Form.Item>

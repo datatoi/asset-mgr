@@ -22,7 +22,7 @@ service firebase.storage {
       allow write: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    match /types/{allPaths=**} {
+    match /products/{allPaths=**} {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && isAnyAdmin();
     }

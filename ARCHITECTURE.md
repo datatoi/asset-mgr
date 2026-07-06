@@ -33,8 +33,8 @@ Two client surfaces share one Firebase backend and one Firestore data model.
 ```
 
 - **`web/`** is the primary app: subscription/group setup, catalog CRUD
-  (classes/types/items/kits), member management, browsing, requests, transfers.
-  Deployed to **Firebase Hosting**.
+  (categories/products/items/kits), member management, browsing, requests,
+  transfers. Deployed to **Firebase Hosting**.
 - **`mobile/`** is intentionally thin: tap an NFC tag → resolve `itemId` →
   show the item → one quick action. Not built yet (Phase 6) because it needs a
   native build; NFC doesn't work in a browser on iOS.
@@ -97,9 +97,11 @@ asset-mgr/
 │       ├── pages/
 │       │   ├── Login.tsx            "Login with Google"
 │       │   ├── RegisterPage.tsx      Calls registerSubscription (Subscription+Group+owner)
-│       │   ├── Dashboard.tsx         Item grid, filter by class/type/search
-│       │   ├── ClassesPage.tsx       Class CRUD (admin)
-│       │   ├── TypesPage.tsx         Type CRUD + image (admin)
+│       │   ├── JoinPage.tsx           /join/:subscriptionId — calls joinSubscription
+│       │   ├── Dashboard.tsx         Item grid, filter by category/product/search;
+│       │   │                          shows the invite link + copy button for admins
+│       │   ├── CategoriesPage.tsx    Category CRUD (admin)
+│       │   ├── ProductsPage.tsx      Product CRUD + image (admin)
 │       │   ├── ItemsPage.tsx         Item CRUD + image + rfidTag (admin)
 │       │   ├── ItemDetail.tsx        Item view: Comments tab, Holder History tab, request button
 │       │   ├── KitsPage.tsx          Kit CRUD (admin) + "Request Kit" (user, calls requestKit)
@@ -116,8 +118,9 @@ asset-mgr/
     ├── package.json
     ├── tsconfig.json
     └── src/
-        └── index.ts             registerSubscription, transferItem, requestKit,
-                                   assignRole (all onCall; region europe-west1)
+        └── index.ts             registerSubscription, joinSubscription,
+                                   transferItem, requestKit, assignRole
+                                   (all onCall; region europe-west1)
 ```
 
 ### Where things will grow

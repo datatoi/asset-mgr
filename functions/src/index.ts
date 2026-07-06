@@ -213,7 +213,7 @@ export const transferItem = onCall(async (request) => {
 });
 
 /**
- * Automatically picks one available item per required type for a kit and
+ * Automatically picks one available item per required product for a kit and
  * creates a pending request for each, matching the requester's size/gender.
  * "storage" is the sentinel holderId meaning "not currently checked out."
  */
@@ -240,17 +240,33 @@ export const requestKit = onCall(async (request) => {
   }
 
   const kitData = kitDoc.data()!;
-  const {typeIds, subscriptionId, groupId} = kitData;
-  const userSize = userData.size;
+  const {productIds, subscriptionId, groupId} = kitData;
   const userGender = userData.gender;
+  const userSizes: Record<string, string> = userData.sizes || {};
 
   const batch = db.batch();
   const requestsCreated: string[] = [];
 
-  for (const typeId of typeIds) {
+  for (const productId of productIds) {
+    // Sizes are per-category (a shoe size and a dress size aren't the same
+    // scale), so first resolve which category this product belongs to.
+    const productDoc = await db.collection("products").doc(productId).get();
+    if (!productDoc.exists) {
+      throw new HttpsError("not-found", `Product ${productId} not found.`);
+    }
+    const categoryId = productDoc.data()?.categoryId;
+    const userSize = userSizes[categoryId];
+    if (!userSize) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Set your size for category ${categoryId} in your profile ` +
+        "before requesting this kit."
+      );
+    }
+
     const itemsQuery = await db.collection("items")
       .where("subscriptionId", "==", subscriptionId)
-      .where("typeId", "==", typeId)
+      .where("productId", "==", productId)
       .where("holderId", "==", "storage")
       .where("size", "==", userSize)
       .where("gender", "==", userGender)
@@ -260,7 +276,7 @@ export const requestKit = onCall(async (request) => {
     if (!availableItem) {
       throw new HttpsError(
         "failed-precondition",
-        `No available item for type ${typeId} in size ${userSize}`
+        `No available item for product ${productId} in size ${userSize}`
       );
     }
 

@@ -34,9 +34,12 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       `RegisterPage` (creates Subscription + first Group + owner user doc in
       one batch); a dedicated "add another group" flow doesn't exist yet
 - [x] Member invite flow + role assignment (per-group: superadmin/admin/user)
-      — `MembersPage` lists all users in the subscription and lets an admin
-      change their role per group; there's no email-invite step, members must
-      already have signed in once to appear
+      — `MembersPage` lets an admin change a member's role per group; joining
+      itself is now via **invite link** (`/join/{subscriptionId}`, shown with
+      a copy button on the Dashboard for admins → `JoinPage` → `joinSubscription`
+      Cloud Function adds the visitor as `'user'` in every group of that
+      subscription), so members no longer need to be manually added first —
+      they just need to have signed in once via the link
 - [x] Cloud Function: role assignment/revocation (superadmin-only, per group)
       — `assignRole`
 - [x] Fixed a real bug: `RegisterPage` originally wrote the Subscription/Group/
@@ -46,19 +49,31 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       create — impossible on first creation). Added the `registerSubscription`
       Cloud Function (Admin SDK, bypasses rules) to do this atomically instead;
       `RegisterPage` now just calls it.
+- [x] Fixed a real security gap while adding the invite link: the `users`
+      collection's `create` rule let any authenticated user self-write their
+      own profile doc with **any** `subscriptionId`/`groups` value, bypassing
+      Cloud Functions entirely — anyone could self-grant `superadmin` in any
+      group just by knowing its ID. Tightened `create` (to match `update`,
+      which already blocked this) to reject `subscriptionId`/`groups` on
+      direct client writes; both join paths already go through Cloud
+      Functions (Admin SDK bypasses rules), so nothing legitimate changes.
 
 ## Phase 2 — Catalog management (web)
-- [x] Classes CRUD (e.g. dress, shoes, trousers, shirt, boots)
-- [x] Types CRUD (variant + gender + **image upload** to Cloud Storage)
-- [x] Items CRUD (type, size, gender, condition, **image**, **rfidTag**,
+- [x] Categories CRUD (e.g. dress, shoes, trousers, shirt, boots) — originally
+      named "Classes"/`classes`, renamed to Categories/`categories` (dev-only,
+      no backward compatibility needed)
+- [x] Products CRUD (variant + gender + **image upload** to Cloud Storage) —
+      originally named "Types"/`types`, renamed to Products/`products`
+- [x] Items CRUD (product, size, gender, condition, **image**, **rfidTag**,
       owner, holder) — holder defaults to sentinel `"storage"` on creation
-- [x] Kits CRUD (name, gender, size, required `typeIds`, description) —
-      originally built (and documented) as `classIds`, corrected to reference
-      specific Types instead of broad Classes (a kit needs "Red Dress", not
-      just any "Dress"); also simplified `requestKit` by removing the
-      now-unneeded classId→typeIds resolution step
-- [x] Image upload/preview component (reused for types, items, avatars)
-- [x] Fixed a real bug: "Add Type" (and equally Items/Profile avatar) failed
+- [x] Kits CRUD (name, gender, size, required `productIds`, description) —
+      went through two renames: originally `classIds` (wrong level - a kit
+      needs a specific "Red Dress", not just any "Dress"), corrected to
+      `typeIds` referencing the Type/Product entity, then renamed again to
+      `productIds` when Type→Product; also simplified `requestKit` by
+      removing the now-unneeded category→product resolution step
+- [x] Image upload/preview component (reused for products, items, avatars)
+- [x] Fixed a real bug: "Add Product" (and equally Items/Profile avatar) failed
       with a generic "Operation failed" whenever no image was uploaded. Cause:
       the Firestore JS SDK throws client-side on any field with value
       `undefined` (e.g. `imageUrl` before `ImageUpload`'s `onChange` ever
@@ -83,19 +98,19 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       new deployments don't hit this.
 
 ## Phase 3 — Browsing & detail (web)
-- [x] Dashboard: list all items, filter by class / type / search (client-side
-      filtering over the subscription's items — fine at current scale)
+- [x] Dashboard: list all items, filter by category / product / search
+      (client-side filtering over the subscription's items — fine at current scale)
 - [x] Item detail view: all properties + current holder/owner
 - [x] Detail Tab: Comments (list + add form, any user)
 - [x] Detail Tab: Holder history (chronological, shows who initiated if admin)
 - [ ] Composite Firestore indexes for the filter combinations — not yet
       needed since Dashboard filters client-side; revisit if/when filtering
-      moves server-side (`where` queries on class/type/size together)
+      moves server-side (`where` queries on category/product/size together)
 
 ## Phase 4 — Requests & transfers
 - [x] "Request kit" button → Cloud Function (`requestKit`) auto-picks
-      available items by size/gender per required type; fails with
-      `failed-precondition` if a type has none available
+      available items by size/gender per required product; fails with
+      `failed-precondition` if a product has none available
 - [x] "Request item" flow (single item, from `ItemDetail`)
 - [x] Request inbox: approve / decline (holder or admin) — approve calls
       `transferItem`, decline is a direct client update restricted by rules
@@ -173,13 +188,13 @@ world — no "bootstrap the first Platform Admin" step needed.
 Writing real TypeScript interfaces against the actual imported code surfaced
 two places where the implementation quietly diverged from what CLAUDE.md/
 agents.md document:
-- [ ] `groupId` is documented on `classes`/`types`/`items`/`kits`, but no page
-      (`ClassesPage`, `TypesPage`, `ItemsPage`, `KitsPage`) ever actually
-      writes it - catalog data is only ever scoped by `subscriptionId` in
-      practice. `ItemDetail`'s single-item request flow writes
-      `groupId: item.groupId` when creating a request, which is therefore
-      always `undefined` today. Decide: add real `groupId` support to the
-      catalog pages, or drop it from the documented schema for these
+- [ ] `groupId` is documented on `categories`/`products`/`items`/`kits`, but no
+      page (`CategoriesPage`, `ProductsPage`, `ItemsPage`, `KitsPage`) ever
+      actually writes it - catalog data is only ever scoped by
+      `subscriptionId` in practice. `ItemDetail`'s single-item request flow
+      writes `groupId: item.groupId` when creating a request, which is
+      therefore always `undefined` today. Decide: add real `groupId` support
+      to the catalog pages, or drop it from the documented schema for these
       collections (a subscription-only scope may be all that's needed).
 - [ ] `ownerId` (the long-term "owner" half of the Owner-vs-Holder model) is
       documented on `items` but never read or written anywhere in the UI -

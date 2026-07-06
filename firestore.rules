@@ -33,7 +33,14 @@ service cloud.firestore {
       // Clients can update their own profile EXCEPT roles (groups map)
       allow update: if isAuthenticated() && request.auth.uid == userId
                     && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['groups', 'subscriptionId']);
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Clients may self-create their own profile doc, but never with
+      // subscriptionId/groups set directly - that would let anyone grant
+      // themselves a role in any group just by knowing its ID. Joining a
+      // subscription (registration or invite link) always goes through a
+      // Cloud Function (Admin SDK, bypasses these rules).
+      allow create: if isAuthenticated() && request.auth.uid == userId
+                    && !('subscriptionId' in request.resource.data)
+                    && !('groups' in request.resource.data);
     }
 
     match /subscriptions/{subId} {
@@ -49,12 +56,12 @@ service cloud.firestore {
       allow write: if isAuthenticated() && hasRole(groupId, ['superadmin']);
     }
 
-    match /classes/{id} {
+    match /categories/{id} {
       allow read: if isAuthenticated() && belongsToSub(resource.data);
       allow write: if isAuthenticated() && isAnyAdmin();
     }
 
-    match /types/{id} {
+    match /products/{id} {
       allow read: if isAuthenticated() && belongsToSub(resource.data);
       allow write: if isAuthenticated() && isAnyAdmin();
     }

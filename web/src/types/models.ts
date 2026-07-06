@@ -37,22 +37,24 @@ export interface UserProfile {
   email?: string
   avatarUrl?: string | null
   groups?: Record<string, Role>
-  size?: string
+  // Per-Category size (categoryId -> size string), not one flat size - a
+  // shoe size and a dress size are different scales entirely.
+  sizes?: Record<string, string>
   gender?: Gender
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }
 
-export interface AssetClass {
+export interface Category {
   id: string
   subscriptionId: string
   name: string
 }
 
-export interface ItemType {
+export interface Product {
   id: string
   subscriptionId: string
-  classId: string
+  categoryId: string
   name: string
   gender: Gender
   imageUrl?: string
@@ -61,13 +63,17 @@ export interface ItemType {
 export interface Item {
   id: string
   subscriptionId: string
-  typeId: string
+  productId: string
   size?: string
   gender?: Gender
   condition?: Condition
   imageUrl?: string
   rfidTag?: string
   holderId: string
+  // Long-term assigned person, distinct from holderId (who has it right now).
+  // Admin/superadmin-editable directly (no Cloud Function/history - unlike
+  // holderId, owner changes aren't audited, by design).
+  ownerId?: string
   createdAt?: Timestamp
   updatedAt?: Timestamp
   // Written by the single-item request flow (ItemDetail) but never actually
@@ -100,11 +106,10 @@ export interface Kit {
   subscriptionId: string
   name: string
   gender: Gender
-  // Concrete ItemTypes this kit requires one of each (e.g. "Red Dress",
-  // "Black Shoes") - not the broader AssetClass. A Class is a general
-  // category; a Type is the specific product-like variant that's actually
-  // checked out.
-  typeIds: string[]
+  // Concrete Products this kit requires one of each (e.g. "Red Dress",
+  // "Black Shoes") - not the broader Category. A Category is a general
+  // grouping; a Product is the specific variant that's actually checked out.
+  productIds: string[]
   description?: string
 }
 
