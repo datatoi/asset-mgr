@@ -4,12 +4,13 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
-import type { Item, Product } from '../types/models';
+import type { Group, Item, Product } from '../types/models';
 
 const ItemsPage: React.FC = () => {
   const { userData } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
@@ -27,10 +28,15 @@ const ItemsPage: React.FC = () => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });
 
-    return () => { unsubItems(); unsubProducts(); };
+    const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubGroups = onSnapshot(qGroups, (snapshot) => {
+      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+    });
+
+    return () => { unsubItems(); unsubProducts(); unsubGroups(); };
   }, [userData]);
 
-  const onFinish = async (values: Pick<Item, 'productId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl'>) => {
+  const onFinish = async (values: Pick<Item, 'productId' | 'groupId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = {
@@ -73,6 +79,11 @@ const ItemsPage: React.FC = () => {
       render: (g: string) => <Tag color={g === 'male' ? 'blue' : 'magenta'}>{g?.toUpperCase()}</Tag>
     },
     { title: 'RFID Tag', dataIndex: 'rfidTag' },
+    {
+      title: 'Group',
+      dataIndex: 'groupId',
+      render: (id: string) => groups.find(g => g.id === id)?.name || 'Unknown'
+    },
     {
       title: 'Holder',
       dataIndex: 'holderId',
@@ -120,6 +131,11 @@ const ItemsPage: React.FC = () => {
               </Space>
               <Form.Item name="rfidTag" label="NFC / RFID Tag ID"><Input placeholder="Scan or type Tag UID" /></Form.Item>
               <Form.Item name="condition" label="Condition"><Select><Select.Option value="new">New</Select.Option><Select.Option value="good">Good</Select.Option><Select.Option value="worn">Worn</Select.Option><Select.Option value="damaged">Damaged</Select.Option></Select></Form.Item>
+              <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+                <Select placeholder="Select Group">
+                  {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+                </Select>
+              </Form.Item>
             </div>
           </Space>
         </Form>

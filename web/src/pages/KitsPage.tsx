@@ -4,12 +4,13 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db, functions } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { httpsCallable } from 'firebase/functions';
-import type { Kit, Product } from '../types/models';
+import type { Group, Kit, Product } from '../types/models';
 
 const KitsPage: React.FC = () => {
   const { userData } = useAuth();
   const [kits, setKits] = useState<Kit[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKit, setEditingKit] = useState<Kit | null>(null);
   const [requestLoading, setRequestLoading] = useState<string | null>(null);
@@ -30,7 +31,12 @@ const KitsPage: React.FC = () => {
       setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
     });
 
-    return () => { unsubKits(); unsubProducts(); };
+    const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubGroups = onSnapshot(qGroups, (snapshot) => {
+      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+    });
+
+    return () => { unsubKits(); unsubProducts(); unsubGroups(); };
   }, [userData]);
 
   const handleRequest = async (kitId: string) => {
@@ -46,7 +52,7 @@ const KitsPage: React.FC = () => {
     }
   };
 
-  const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'productIds' | 'description'>) => {
+  const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'productIds' | 'description' | 'groupId'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = { ...values, subscriptionId: userData.subscriptionId };
@@ -73,6 +79,11 @@ const KitsPage: React.FC = () => {
         const productName = products.find(p => p.id === id)?.name;
         return <Tag key={id} color="blue">{productName}</Tag>;
       })
+    },
+    {
+      title: 'Group',
+      dataIndex: 'groupId',
+      render: (id: string) => groups.find(g => g.id === id)?.name || 'Unknown'
     },
     {
       title: 'Action',
@@ -117,6 +128,11 @@ const KitsPage: React.FC = () => {
             </Select>
           </Form.Item>
           <Form.Item name="description" label="Description"><Input.TextArea /></Form.Item>
+          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+            <Select placeholder="Select Group">
+              {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            </Select>
+          </Form.Item>
         </Form>
       </Modal>
     </div>

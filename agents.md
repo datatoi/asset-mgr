@@ -80,6 +80,10 @@ admin/superadmin on the Item Detail view.
 
 4.  **Item Detail View** (all authenticated users) — all properties (product,
     category, size, gender, condition, description, image), current owner and holder.
+    *   **Admin/superadmin**: current Owner and Holder are dropdowns instead
+        of plain text — pick any member to reassign directly. Holder changes
+        call `transferItem` (logged to holder history); owner changes are a
+        plain update (not audited).
     *   **Tab: Comments** — list existing; form for any user to add one.
     *   **Tab: Holder History** — chronological past holders + transfer dates,
         including who initiated the change (if admin/superadmin).

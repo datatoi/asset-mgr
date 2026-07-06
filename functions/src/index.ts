@@ -139,6 +139,64 @@ export const joinSubscription = onCall(async (request) => {
 });
 
 /**
+ * Creates a new Group within the caller's Subscription (e.g. age divisions
+ * like "Seniors"/"Youth"/"Middle-aged"). Firestore rules only let a user
+ * write an existing group they're already superadmin of (`hasRole(groupId,
+ * ['superadmin'])`), which can never match a brand-new groupId - so creating
+ * a group, and granting the creator superadmin of it, must go through the
+ * Admin SDK here, same as registerSubscription/joinSubscription.
+ */
+export const createGroup = onCall(async (request) => {
+  const {auth} = request;
+  if (!auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated.");
+  }
+
+  const {name, description} = request.data;
+  if (!name) {
+    throw new HttpsError("invalid-argument", "Missing name.");
+  }
+
+  const callerDoc = await db.collection("users").doc(auth.uid).get();
+  const callerData = callerDoc.data();
+  const subscriptionId = callerData?.subscriptionId;
+  if (!subscriptionId) {
+    throw new HttpsError(
+      "failed-precondition",
+      "You must belong to a subscription to create a group."
+    );
+  }
+
+  const callerGroups: Record<string, string> = callerData?.groups || {};
+  const isSuperAdmin = Object.values(callerGroups).some(
+    (role) => role === "superadmin"
+  );
+  if (!isSuperAdmin) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only superadmins can create groups."
+    );
+  }
+
+  const groupRef = db.collection("groups").doc();
+  const batch = db.batch();
+  batch.set(groupRef, {
+    subscriptionId,
+    name,
+    description: description || "",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  batch.update(callerDoc.ref, {
+    [`groups.${groupRef.id}`]: "superadmin",
+  });
+  await batch.commit();
+
+  logger.info(`Group ${groupRef.id} created by ${auth.uid}`);
+
+  return {groupId: groupRef.id};
+});
+
+/**
  * Transfers an item to a new holder. Callable by the current holder (self
  * hand-over) or by an admin/superadmin of the item's group.
  */
@@ -167,8 +225,16 @@ export const transferItem = onCall(async (request) => {
 
   const userDoc = await db.collection("users").doc(auth.uid).get();
   const userData = userDoc.data();
-  const userRole = userData?.groups?.[groupId];
-  const isAdmin = userRole === "admin" || userRole === "superadmin";
+  // Items aren't actually scoped to a specific group in practice (groupId is
+  // never set by any catalog page - see todo.md), so admin status is
+  // "admin/superadmin in any of the caller's groups," matching how isAdmin is
+  // computed everywhere else in this app (client checks, isAnyAdmin() in
+  // firestore.rules) - not a lookup keyed by itemData.groupId, which would
+  // always miss since that field doesn't exist on real items.
+  const userGroups: Record<string, string> = userData?.groups || {};
+  const isAdmin = Object.values(userGroups).some(
+    (role) => role === "admin" || role === "superadmin"
+  );
 
   if (!isAdmin && currentHolderId !== auth.uid) {
     throw new HttpsError(

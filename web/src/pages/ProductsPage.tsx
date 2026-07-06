@@ -4,12 +4,13 @@ import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
-import type { Category, Product } from '../types/models';
+import type { Category, Group, Product } from '../types/models';
 
 const ProductsPage: React.FC = () => {
   const { userData } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
@@ -35,9 +36,16 @@ const ProductsPage: React.FC = () => {
       setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
     });
 
+    // Sync Groups for the dropdown
+    const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubGroups = onSnapshot(qGroups, (snapshot) => {
+      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+    });
+
     return () => {
       unsubProducts();
       unsubCategories();
+      unsubGroups();
     };
   }, [userData]);
 
@@ -53,7 +61,7 @@ const ProductsPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const onFinish = async (values: Pick<Product, 'name' | 'categoryId' | 'gender' | 'imageUrl'>) => {
+  const onFinish = async (values: Pick<Product, 'name' | 'categoryId' | 'groupId' | 'gender' | 'imageUrl'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = {
@@ -92,6 +100,12 @@ const ProductsPage: React.FC = () => {
       dataIndex: 'gender',
       key: 'gender',
       render: (g: string) => <Tag color={g === 'male' ? 'blue' : g === 'female' ? 'magenta' : 'default'}>{g.toUpperCase()}</Tag>
+    },
+    {
+      title: 'Group',
+      dataIndex: 'groupId',
+      key: 'groupId',
+      render: (id: string) => groups.find(g => g.id === id)?.name || 'Unknown'
     },
     {
       title: 'Action',
@@ -143,6 +157,11 @@ const ProductsPage: React.FC = () => {
               <Select.Option value="male">Male</Select.Option>
               <Select.Option value="female">Female</Select.Option>
               <Select.Option value="unisex">Unisex</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+            <Select placeholder="Select Group">
+              {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
             </Select>
           </Form.Item>
         </Form>

@@ -7,7 +7,8 @@ import {
   GroupOutlined,
   TagsOutlined,
   UserOutlined,
-  InboxOutlined
+  InboxOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
@@ -23,6 +24,7 @@ import KitsPage from './pages/KitsPage';
 import ProfilePage from './pages/ProfilePage';
 import RequestInbox from './pages/RequestInbox';
 import MembersPage from './pages/MembersPage';
+import GroupsPage from './pages/GroupsPage';
 
 const { Header, Content, Sider } = Layout;
 
@@ -41,6 +43,7 @@ const App: React.FC = () => {
     { key: '/kits', icon: <InboxOutlined />, label: 'Kits' },
     { key: '/requests', icon: <InboxOutlined />, label: 'Requests' },
     ...(isAdmin ? [{ key: '/members', icon: <UserOutlined />, label: 'Members' }] : []),
+    ...(isAdmin ? [{ key: '/groups', icon: <TeamOutlined />, label: 'Groups' }] : []),
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
   ];
 
@@ -77,6 +80,7 @@ const App: React.FC = () => {
             <Route path="/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
             <Route path="/requests" element={<ProtectedRoute><RequestInbox /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
+            <Route path="/groups" element={<ProtectedRoute><GroupsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           </Routes>

@@ -116,10 +116,18 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       `transferItem`, decline is a direct client update restricted by rules
 - [x] Cloud Function: on approve → update `holderId`, append `holderHistory`,
       mark request `transferred` — `transferItem`
-- [ ] Admin direct transfer (change holder, auto-logged) — **backend supports
-      it** (`transferItem` accepts `transferType: 'admin'` with no
-      `requestId`), but no UI screen calls it outside the request-approval
-      flow yet. Needs e.g. a "Change holder" action on `ItemsPage`/`ItemDetail`.
+- [x] Admin direct transfer (change holder, auto-logged) — `ItemDetail` shows
+      Holder as a dropdown (any subscription member, or "Storage") for
+      admin/superadmin, calling `transferItem` with `transferType: 'admin'`
+      and no `requestId`, same as before but now with a real UI entry point
+- [x] Admin direct owner reassignment — `ItemDetail` also shows Owner as an
+      admin-only dropdown; resolves the long-standing doc/code discrepancy
+      where `ownerId` was documented but never implemented (see "Data model
+      doc/code discrepancies" below - now resolved). Owner changes are a
+      plain `updateDoc` (rules already allow it — only `holderId`/
+      `subscriptionId` are blocked from direct client writes), not routed
+      through a Cloud Function or logged to history, since owner isn't part
+      of the audited checkout workflow the way holder is
 - [x] User profile/settings: edit own size/gender + avatar upload
 
 ## Phase 5 — Security
@@ -196,16 +204,19 @@ agents.md document:
       therefore always `undefined` today. Decide: add real `groupId` support
       to the catalog pages, or drop it from the documented schema for these
       collections (a subscription-only scope may be all that's needed).
-- [ ] `ownerId` (the long-term "owner" half of the Owner-vs-Holder model) is
-      documented on `items` but never read or written anywhere in the UI -
-      only `holderId` is actually tracked. Decide: implement the owner
-      concept for real, or simplify the docs to describe only `holderId`.
+- [x] ~~`ownerId` documented but never implemented~~ — **resolved**: added
+      `ownerId` to the `Item` model and an admin/superadmin dropdown on
+      `ItemDetail` to set it directly (see Phase 4).
 
 ## Open questions / decisions to revisit
-- [ ] Kit "size" model — one kit size, or per-item sizing at fulfillment time?
+- [x] ~~Kit "size" model — one kit size, or per-item sizing at fulfillment
+      time?~~ — **resolved**: per-**category** sizing. `UserProfile.sizes` is
+      a `{ categoryId: size }` map (a shoe size and a dress size aren't the
+      same scale); `requestKit` resolves each required product's category and
+      matches against that category's stored size.
 - [ ] What quick action is the scanner's default on tap (identify vs check-out)?
 - [ ] Booking for future events (reserve kits for a date) — in scope later?
 - [ ] Notifications for pending requests (email / push)?
-- [ ] Admin direct-transfer UI (see Phase 4 note above)
-- [ ] Should `MembersPage` support inviting a user by email who hasn't signed
-      in yet, or is "sign in once, then get assigned a role" acceptable?
+- [x] ~~Should `MembersPage` support inviting a user by email who hasn't
+      signed in yet~~ — **resolved**: invite link (`/join/{subscriptionId}`)
+      lets anyone sign in and join directly, no pre-existing account needed.

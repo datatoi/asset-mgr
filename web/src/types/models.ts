@@ -48,12 +48,14 @@ export interface UserProfile {
 export interface Category {
   id: string
   subscriptionId: string
+  groupId: string
   name: string
 }
 
 export interface Product {
   id: string
   subscriptionId: string
+  groupId: string
   categoryId: string
   name: string
   gender: Gender
@@ -63,6 +65,7 @@ export interface Product {
 export interface Item {
   id: string
   subscriptionId: string
+  groupId: string
   productId: string
   size?: string
   gender?: Gender
@@ -76,9 +79,6 @@ export interface Item {
   ownerId?: string
   createdAt?: Timestamp
   updatedAt?: Timestamp
-  // Written by the single-item request flow (ItemDetail) but never actually
-  // set on the item itself anywhere - see todo.md for this known gap.
-  groupId?: string
 }
 
 export interface ItemComment {
@@ -104,6 +104,7 @@ export interface HolderHistoryEntry {
 export interface Kit {
   id: string
   subscriptionId: string
+  groupId: string
   name: string
   gender: Gender
   // Concrete Products this kit requires one of each (e.g. "Red Dress",

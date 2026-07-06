@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm } from 'antd';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
-import type { Category } from '../types/models';
+import type { Category, Group } from '../types/models';
 
 const CategoriesPage: React.FC = () => {
   const { userData } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = Form.useForm();
@@ -25,7 +26,12 @@ const CategoriesPage: React.FC = () => {
       setCategories(data);
     });
 
-    return () => unsubscribe();
+    const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubGroups = onSnapshot(qGroups, (snapshot) => {
+      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+    });
+
+    return () => { unsubscribe(); unsubGroups(); };
   }, [userData]);
 
   const handleAdd = () => {
@@ -49,7 +55,7 @@ const CategoriesPage: React.FC = () => {
     }
   };
 
-  const onFinish = async (values: Pick<Category, 'name'>) => {
+  const onFinish = async (values: Pick<Category, 'name' | 'groupId'>) => {
     if (!userData?.subscriptionId) return;
     try {
       if (editingCategory) {
@@ -70,6 +76,12 @@ const CategoriesPage: React.FC = () => {
 
   const columns = [
     { title: 'Name', dataIndex: 'name', key: 'name' },
+    {
+      title: 'Group',
+      dataIndex: 'groupId',
+      key: 'groupId',
+      render: (id: string) => groups.find(g => g.id === id)?.name || 'Unknown'
+    },
     {
       title: 'Action',
       key: 'action',
@@ -105,6 +117,11 @@ const CategoriesPage: React.FC = () => {
             rules={[{ required: true, message: 'Please input category name' }]}
           >
             <Input placeholder="e.g. Dress, Shoes, Trousers" />
+          </Form.Item>
+          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+            <Select placeholder="Select Group">
+              {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            </Select>
           </Form.Item>
         </Form>
       </Modal>
