@@ -39,7 +39,10 @@
       "Bash(firebase hosting:channel:list --project dressmanager-540ba)",
       "Bash(gcloud run *)",
       "Bash(curl -s -X POST https://europe-west1-dressmanager-540ba.cloudfunctions.net/transferItem -H 'Content-Type: application/json' -d '{\"data\":{\"itemId\":\"nonexistent\",\"newHolderId\":\"x\",\"transferType\":\"admin\"}}' -w '\\\\nHTTP_STATUS:%{http_code}\\\\n')",
-      "Bash(firebase functions:log --project dressmanager-540ba --only transferItem -n 20)"
+      "Bash(firebase functions:log --project dressmanager-540ba --only transferItem -n 20)",
+      "Bash(curl -s https://dressmanager-540ba.web.app/)",
+      "Bash(grep -rn \"/items/\\\\${\" /Users/edgars/ws/asset-mgr/web/src/)",
+      "Bash(firebase functions:log --project dressmanager-540ba --only transferItem -n 100)"
     ],
     "additionalDirectories": [
       "/private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad"

@@ -72,6 +72,7 @@ export interface Item {
   condition?: Condition
   imageUrl?: string
   rfidTag?: string
+  description?: string
   holderId: string
   // Long-term assigned person, distinct from holderId (who has it right now).
   // Admin/superadmin-editable directly (no Cloud Function/history - unlike

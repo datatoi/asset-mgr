@@ -188,6 +188,7 @@ const ItemDetail: React.FC = () => {
               <Descriptions.Item label="RFID Tag">{item.rfidTag || 'None'}</Descriptions.Item>
               <Descriptions.Item label="Size">{item.size}</Descriptions.Item>
               <Descriptions.Item label="Condition"><Tag color="orange">{item.condition?.toUpperCase()}</Tag></Descriptions.Item>
+              <Descriptions.Item label="Description">{item.description || 'None'}</Descriptions.Item>
               <Descriptions.Item label="Current Holder">
                 {isAdmin ? (
                   <Select

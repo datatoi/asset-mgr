@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -8,6 +9,7 @@ import type { Group, Item, Product } from '../types/models';
 
 const ItemsPage: React.FC = () => {
   const { userData } = useAuth();
+  const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -36,7 +38,7 @@ const ItemsPage: React.FC = () => {
     return () => { unsubItems(); unsubProducts(); unsubGroups(); };
   }, [userData]);
 
-  const onFinish = async (values: Pick<Item, 'productId' | 'groupId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl'>) => {
+  const onFinish = async (values: Pick<Item, 'productId' | 'groupId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl' | 'description'>) => {
     if (!userData?.subscriptionId) return;
     try {
       const data = {
@@ -93,7 +95,8 @@ const ItemsPage: React.FC = () => {
       title: 'Action',
       key: 'action',
       render: (_: unknown, record: Item) => (
-        <Space>
+        <Space onClick={(e) => e.stopPropagation()}>
+          <Button type="link" onClick={() => navigate(`/items/${record.id}`)}>View</Button>
           <Button type="link" onClick={() => { setEditingItem(record); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
           <Popconfirm title="Delete item?" onConfirm={() => deleteDoc(doc(db, 'items', record.id))}><Button type="link" danger>Delete</Button></Popconfirm>
         </Space>
@@ -107,7 +110,15 @@ const ItemsPage: React.FC = () => {
         <h2>Physical Items (Inventory)</h2>
         <Button type="primary" onClick={() => { setEditingItem(null); form.resetFields(); setIsModalOpen(true); }}>Add Item</Button>
       </div>
-      <Table dataSource={items} columns={columns} rowKey="id" />
+      <Table
+        dataSource={items}
+        columns={columns}
+        rowKey="id"
+        onRow={(record) => ({
+          onClick: () => navigate(`/items/${record.id}`),
+          style: { cursor: 'pointer' },
+        })}
+      />
 
       <Modal title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700}>
         <Form form={form} layout="vertical" onFinish={onFinish}>
@@ -131,6 +142,7 @@ const ItemsPage: React.FC = () => {
               </Space>
               <Form.Item name="rfidTag" label="NFC / RFID Tag ID"><Input placeholder="Scan or type Tag UID" /></Form.Item>
               <Form.Item name="condition" label="Condition"><Select><Select.Option value="new">New</Select.Option><Select.Option value="good">Good</Select.Option><Select.Option value="worn">Worn</Select.Option><Select.Option value="damaged">Damaged</Select.Option></Select></Form.Item>
+              <Form.Item name="description" label="Description"><Input.TextArea rows={2} placeholder="Notes about this specific item" /></Form.Item>
               <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
                 <Select placeholder="Select Group">
                   {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}

@@ -10,6 +10,12 @@ admin.initializeApp();
 setGlobalOptions({region: "europe-west1"});
 
 const db = admin.firestore();
+// Matches the client SDK's `ignoreUndefinedProperties`
+// (web/src/lib/firebase.ts) - e.g. items created before `groupId` became a
+// required field don't have it set, and holderHistory writes include
+// `groupId: itemData.groupId`, which the Admin SDK otherwise rejects
+// outright as an invalid Firestore value.
+db.settings({ignoreUndefinedProperties: true});
 
 /**
  * Bootstraps a new Subscription + first Group for the caller, and makes them
