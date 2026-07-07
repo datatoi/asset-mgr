@@ -97,15 +97,17 @@ service cloud.firestore {
     match /requests/{reqId} {
       allow read: if isAuthenticated() && belongsToSub(resource.data);
       allow create: if isAuthenticated();
-      // Clients may only decline a pending request (requester cancelling, or
-      // the current holder/admin turning it down), changing status+declinedAt
-      // and nothing else. Approval always goes through the transferItem
-      // Cloud Function, which is what actually moves holderId and writes
-      // holderHistory - never allow status to reach 'approved'/'transferred'
-      // via a direct client write.
+      // Clients may only decline a pending request (requester cancelling, the
+      // current holder/admin turning it down, or - for a holder/owner-
+      // initiated push transfer - the offered recipient turning it down),
+      // changing status+declinedAt and nothing else. Approval always goes
+      // through the transferItem Cloud Function, which is what actually
+      // moves holderId and writes holderHistory - never allow status to
+      // reach 'approved'/'transferred' via a direct client write.
       allow update: if isAuthenticated() && (
         request.auth.uid == resource.data.requestedByUserId ||
         request.auth.uid == resource.data.currentHolderId ||
+        request.auth.uid == resource.data.targetUserId ||
         isAnyAdmin()
       ) && resource.data.status == 'pending'
         && request.resource.data.status == 'declined'

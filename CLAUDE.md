@@ -85,8 +85,10 @@ Catalog hierarchy: **Category → Product → Item**, plus **Kit** (checkout uni
   `description` — no flat `size` field; fulfillment matches per-category
   against the requester's `sizes` map (see Kit request / checkout below)
 - `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
-  `currentHolderId`, `status` (`pending`|`approved`|`declined`|`transferred`),
-  `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`
+  `currentHolderId`, `targetUserId?` (set only for a holder/owner-initiated
+  "push" transfer — see Kit request / checkout below), `status`
+  (`pending`|`approved`|`declined`|`transferred`), `requestedAt`,
+  `approvedAt?`, `declinedAt?`, `transferredAt?`
 
 ### Owner vs Holder
 Both are **people**. `ownerId` = long-term assigned person; `holderId` = who
@@ -109,6 +111,16 @@ available items.
 ## Key workflows
 - **Onboarding**: Google login → create Subscription (owner) → create Group(s) →
   build catalog (categories → products → items, with photos + NFC tags) → invite members.
+- **Groups**: `registerSubscription` creates one default Group; superadmins add
+  more later via `GroupsPage` (e.g. age divisions like "Seniors"/"Youth"/
+  "Middle-aged"), which calls the `createGroup` Cloud Function. Firestore rules
+  only let a caller write a Group they're already `superadmin` of
+  (`hasRole(groupId, ['superadmin'])`), which can never match a brand-new
+  groupId, so creation — and granting the creator `superadmin` of the new
+  Group, since `users.groups` is blocked from direct client writes — must go
+  through the Admin SDK, same as `registerSubscription`/`joinSubscription`.
+  Every Category/Product/Item/Kit is assigned to one Group via a required
+  `groupId` dropdown on its create form (populated from `GroupsPage`'s list).
 - **Invite link**: `/join/{subscriptionId}`, shown with a copy button on the
   Dashboard for admins. Visiting it (after signing in) calls the
   `joinSubscription` Cloud Function, which adds the caller as `'user'` in
@@ -124,8 +136,19 @@ available items.
   (rejecting with a clear error if not set), then **auto-picks an available
   item** of that product matching that size and the user's **gender**, fails
   gracefully if none available → generates per-item requests.
-- **Approval**: current holder (or admin) approves/declines. On approval, backend
-  updates `holderId`, appends `holderHistory`, marks request `transferred`.
+- **Approval ("pull")**: a non-holder requests an item from `ItemDetail`
+  (`requestedByUserId` = requester, no `targetUserId`); the current holder (or
+  admin) approves/declines. On approval, backend updates `holderId`, appends
+  `holderHistory`, marks request `transferred`.
+- **Transfer offer ("push")**: the current holder or the owner picks a
+  specific person from `ItemDetail`'s "Transfer to..." control and sends them
+  a transfer offer (`requestedByUserId` = holder/owner who initiated it,
+  `targetUserId` = offered recipient). It appears in the recipient's
+  `RequestInbox`; they must accept before `holderId` changes — the backend
+  authorizes this by checking that the caller matches the pending request's
+  `targetUserId` (they're neither the item's current holder nor necessarily
+  an admin, so `transferItem`'s normal holder/admin check alone wouldn't
+  allow it). Declining just marks the request `declined`, same as the pull flow.
 - **Admin transfer**: admin/superadmin changes `holderId` directly; backend logs it.
 - **NFC scan**: tap tag → resolve `itemId` → show item → optional quick transfer.
 
@@ -143,7 +166,8 @@ available items.
 ## Status
 Core web app scaffolded and functional (Firebase project, auth, subscription
 onboarding, catalog CRUD, dashboard, item detail with comments/history,
-kit/item requests, request inbox, member/role management, security rules).
+kit/item requests, request inbox, member/role management, group management,
+security rules).
 Mobile NFC scanner not started (draft-only reference in `mobile/App.tsx`, has
 known issues — see [mobile/README.md](mobile/README.md)). See [todo.md](todo.md)
 for what's left. Original brief preserved in [agents.md](agents.md) (pre-revision;

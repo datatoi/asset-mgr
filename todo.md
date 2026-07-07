@@ -30,9 +30,14 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 - [x] Web: Google login page + auth state / protected routes
 - [x] Subscription registration flow (first login → create Subscription as owner)
 - [x] Create `users` doc on first login with `subscriptionId` + default role
-- [x] Group creation (sub-owner creates one or more groups) — done as part of
-      `RegisterPage` (creates Subscription + first Group + owner user doc in
-      one batch); a dedicated "add another group" flow doesn't exist yet
+- [x] Group creation (sub-owner creates one or more groups) — first Group is
+      created as part of `RegisterPage`/`registerSubscription`; additional
+      Groups (e.g. age divisions like "Seniors"/"Youth"/"Middle-aged") are
+      created later via `GroupsPage` → `createGroup` Cloud Function, which
+      also grants the creator `superadmin` of the new group (Admin SDK, since
+      `firestore.rules` can never let a direct client write create a group —
+      `hasRole(groupId, ['superadmin'])` can't match a groupId that doesn't
+      exist yet)
 - [x] Member invite flow + role assignment (per-group: superadmin/admin/user)
       — `MembersPage` lets an admin change a member's role per group; joining
       itself is now via **invite link** (`/join/{subscriptionId}`, shown with
@@ -129,6 +134,20 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       through a Cloud Function or logged to history, since owner isn't part
       of the audited checkout workflow the way holder is
 - [x] User profile/settings: edit own size/gender + avatar upload
+- [x] Holder/owner-initiated "push" transfer with recipient acceptance —
+      previously the only way to move an item was the "pull" flow (a
+      non-holder requests it, current holder/admin approves) or an admin's
+      direct dropdown transfer; there was no way for the actual holder/owner
+      to proactively hand an item to a specific person without an admin, nor
+      any acceptance step for the recipient. Added a "Transfer to..." control
+      on `ItemDetail` (visible to the current holder or owner) that creates a
+      `requests` doc with a new `targetUserId` field naming the recipient;
+      it shows up in their `RequestInbox` to accept ("Accept & Transfer",
+      calling `transferItem` with that request's `id`) or decline. Required
+      widening `transferItem`'s authorization (previously only the item's
+      current holder or an admin could call it) to also allow the caller when
+      they're the `targetUserId` of the matching pending request, and adding
+      `targetUserId` to the `requests` update rule's decline-allowed actors.
 
 ## Phase 5 — Security
 - [x] Firestore security rules (per-subscription read; admin-only catalog
@@ -196,14 +215,17 @@ world — no "bootstrap the first Platform Admin" step needed.
 Writing real TypeScript interfaces against the actual imported code surfaced
 two places where the implementation quietly diverged from what CLAUDE.md/
 agents.md document:
-- [ ] `groupId` is documented on `categories`/`products`/`items`/`kits`, but no
-      page (`CategoriesPage`, `ProductsPage`, `ItemsPage`, `KitsPage`) ever
-      actually writes it - catalog data is only ever scoped by
-      `subscriptionId` in practice. `ItemDetail`'s single-item request flow
-      writes `groupId: item.groupId` when creating a request, which is
-      therefore always `undefined` today. Decide: add real `groupId` support
-      to the catalog pages, or drop it from the documented schema for these
-      collections (a subscription-only scope may be all that's needed).
+- [x] ~~`groupId` documented on `categories`/`products`/`items`/`kits` but
+      never written~~ — **resolved**: added a required `groupId` `<Select>`
+      (populated from a new `GroupsPage`) to the create/edit forms on
+      `CategoriesPage`, `ProductsPage`, `ItemsPage`, and `KitsPage`, and made
+      the field non-optional on the corresponding TS interfaces. Since there
+      was previously no UI to create a Group beyond the one `registerSubscription`
+      makes, also added `GroupsPage` (list + superadmin-only create form) and
+      a `createGroup` Cloud Function, enabling multiple Groups per Subscription
+      (e.g. age divisions: "Seniors"/"Youth"/"Middle-aged"). `ItemDetail`'s
+      single-item request flow now writes a real `groupId` instead of
+      `undefined`.
 - [x] ~~`ownerId` documented but never implemented~~ — **resolved**: added
       `ownerId` to the `Item` model and an admin/superadmin dropdown on
       `ItemDetail` to set it directly (see Phase 4).

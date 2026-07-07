@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { doc, onSnapshot, collection, query, orderBy, addDoc, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../lib/firebase';
-import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select } from 'antd';
+import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select, Space } from 'antd';
 import { useAuth } from '../auth/AuthContext';
 import type { HolderHistoryEntry, Item, ItemComment, UserProfile } from '../types/models';
 
@@ -19,8 +19,11 @@ const ItemDetail: React.FC = () => {
   const [newComment, setNewComment] = useState('');
   const [requesting, setRequesting] = useState(false);
   const [changingHolder, setChangingHolder] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<string | undefined>();
+  const [sendingTransfer, setSendingTransfer] = useState(false);
 
   const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+  const isHolderOrOwner = item?.holderId === user?.uid || item?.ownerId === user?.uid;
 
   useEffect(() => {
     if (!id) return;
@@ -36,13 +39,13 @@ const ItemDetail: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
-    if (!isAdmin || !userData?.subscriptionId) return;
+    if ((!isAdmin && !isHolderOrOwner) || !userData?.subscriptionId) return;
     const q = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubscribe = onSnapshot(q, (snap) => {
       setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
     });
     return () => unsubscribe();
-  }, [isAdmin, userData?.subscriptionId]);
+  }, [isAdmin, isHolderOrOwner, userData?.subscriptionId]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !id || !user) return;
@@ -74,6 +77,29 @@ const ItemDetail: React.FC = () => {
       message.error('Failed to send request');
     } finally {
       setRequesting(false);
+    }
+  };
+
+  const handleInitiateTransfer = async () => {
+    if (!id || !user || !userData || !item || !transferTarget) return;
+    setSendingTransfer(true);
+    try {
+      await addDoc(collection(db, 'requests'), {
+        subscriptionId: userData.subscriptionId,
+        groupId: item.groupId,
+        itemId: id,
+        requestedByUserId: user.uid,
+        currentHolderId: item.holderId,
+        targetUserId: transferTarget,
+        status: 'pending',
+        requestedAt: serverTimestamp(),
+      });
+      message.success('Transfer offer sent - awaiting their acceptance');
+      setTransferTarget(undefined);
+    } catch (err) {
+      message.error('Failed to send transfer offer: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSendingTransfer(false);
     }
   };
 
@@ -132,6 +158,30 @@ const ItemDetail: React.FC = () => {
                 >
                   {item.holderId === 'storage' ? 'Request from Storage' : 'Request Transfer'}
                 </Button>
+              )}
+              {!isAdmin && isHolderOrOwner && (
+                <Space>
+                  <Select
+                    placeholder="Transfer to..."
+                    style={{ width: 200 }}
+                    value={transferTarget}
+                    onChange={setTransferTarget}
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {members.filter(m => m.id !== user?.uid).map(m => (
+                      <Select.Option key={m.id} value={m.id}>{m.name}</Select.Option>
+                    ))}
+                  </Select>
+                  <Button
+                    type="primary"
+                    disabled={!transferTarget}
+                    loading={sendingTransfer}
+                    onClick={handleInitiateTransfer}
+                  >
+                    Send Transfer Offer
+                  </Button>
+                </Space>
               )}
             </div>
             <Descriptions bordered column={1}>

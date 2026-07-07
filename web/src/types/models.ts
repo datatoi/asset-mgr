@@ -122,6 +122,12 @@ export interface TransferRequest {
   kitId?: string
   requestedByUserId: string
   currentHolderId: string
+  // Set only for holder/owner-initiated "push" transfers (ItemDetail's
+  // "Transfer to..." control): the person being offered the item, who must
+  // accept before it moves. Absent for the older "pull" flow, where a
+  // non-holder requests the item from whoever currently holds it and
+  // `currentHolderId` themselves approves.
+  targetUserId?: string
   status: RequestStatus
   requestedAt?: Timestamp
   declinedAt?: Timestamp

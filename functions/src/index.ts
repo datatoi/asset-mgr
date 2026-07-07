@@ -236,10 +236,29 @@ export const transferItem = onCall(async (request) => {
     (role) => role === "admin" || role === "superadmin"
   );
 
-  if (!isAdmin && currentHolderId !== auth.uid) {
+  let isAuthorized = isAdmin || currentHolderId === auth.uid;
+
+  // Holder/owner-initiated "push" transfers (ItemDetail's "Transfer to..."
+  // control) name a specific recipient who must accept before the item
+  // moves - that recipient is neither the admin nor the current holder, so
+  // check the pending request names them as its target.
+  if (!isAuthorized && requestId) {
+    const requestDoc = await db.collection("requests").doc(requestId).get();
+    const requestData = requestDoc.data();
+    if (
+      requestData?.itemId === itemId &&
+      requestData?.status === "pending" &&
+      requestData?.targetUserId === auth.uid
+    ) {
+      isAuthorized = true;
+    }
+  }
+
+  if (!isAuthorized) {
     throw new HttpsError(
       "permission-denied",
-      "Only the current holder or an admin can transfer this item."
+      "Only the current holder, the offered recipient, or an admin can " +
+      "transfer this item."
     );
   }
 

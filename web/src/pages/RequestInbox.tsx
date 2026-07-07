@@ -16,34 +16,55 @@ const RequestInbox: React.FC = () => {
   useEffect(() => {
     if (!userData?.subscriptionId) return;
 
-    // Admin sees all pending; user sees requests where they are the current holder
+    // Admin sees all pending. A regular user sees requests where they need to
+    // act: either they're the current holder being asked to release the item
+    // (the "pull" flow), or they're the named recipient of a holder/owner-
+    // initiated "push" transfer offer (ItemDetail's "Transfer to..." control).
     const isAdmin = Object.values(userData.groups || {}).some(r => r === 'admin' || r === 'superadmin');
 
-    const q = isAdmin
-      ? query(collection(db, 'requests'), where('subscriptionId', '==', userData.subscriptionId), where('status', '==', 'pending'))
-      : query(collection(db, 'requests'), where('currentHolderId', '==', user?.uid), where('status', '==', 'pending'));
+    if (isAdmin) {
+      const q = query(collection(db, 'requests'), where('subscriptionId', '==', userData.subscriptionId), where('status', '==', 'pending'));
+      const unsubscribe = onSnapshot(q, (snap) => {
+        setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransferRequest)));
+      });
+      return () => unsubscribe();
+    }
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransferRequest)));
+    const asHolder = new Map<string, TransferRequest>();
+    const asTarget = new Map<string, TransferRequest>();
+    const merge = () => setRequests([...asHolder.values(), ...asTarget.values()].filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i));
+
+    const qHolder = query(collection(db, 'requests'), where('currentHolderId', '==', user?.uid), where('status', '==', 'pending'));
+    const unsubHolder = onSnapshot(qHolder, (snap) => {
+      asHolder.clear();
+      snap.docs.forEach(d => asHolder.set(d.id, { id: d.id, ...d.data() } as TransferRequest));
+      merge();
     });
 
-    return () => unsubscribe();
+    const qTarget = query(collection(db, 'requests'), where('targetUserId', '==', user?.uid), where('status', '==', 'pending'));
+    const unsubTarget = onSnapshot(qTarget, (snap) => {
+      asTarget.clear();
+      snap.docs.forEach(d => asTarget.set(d.id, { id: d.id, ...d.data() } as TransferRequest));
+      merge();
+    });
+
+    return () => { unsubHolder(); unsubTarget(); };
   }, [user, userData]);
 
-  const handleAction = async (requestId: string, itemId: string, requesterId: string, action: 'approved' | 'declined') => {
+  const handleAction = async (record: TransferRequest, action: 'approved' | 'declined') => {
     setLoading(true);
     try {
       if (action === 'approved') {
         const transferItemFn = httpsCallable(functions, 'transferItem');
         await transferItemFn({
-          itemId,
-          newHolderId: requesterId,
+          itemId: record.itemId,
+          newHolderId: record.targetUserId || record.requestedByUserId,
           transferType: 'request',
-          requestId // Pass requestId to handle status update in Cloud Function
+          requestId: record.id // Pass requestId to handle status update in Cloud Function
         });
         message.success('Item transferred!');
       } else {
-        await updateDoc(doc(db, 'requests', requestId), {
+        await updateDoc(doc(db, 'requests', record.id), {
           status: 'declined',
           declinedAt: serverTimestamp()
         });
@@ -60,7 +81,14 @@ const RequestInbox: React.FC = () => {
   const columns = [
     { title: 'Requested At', dataIndex: 'requestedAt', render: (d: TransferRequest['requestedAt']) => d?.toDate()?.toLocaleString() },
     { title: 'Item ID', dataIndex: 'itemId' },
-    { title: 'Requester', dataIndex: 'requestedByUserId' },
+    {
+      title: 'Type',
+      key: 'type',
+      render: (_: unknown, record: TransferRequest) => record.targetUserId
+        ? <Tag color="blue">Offered to you</Tag>
+        : <Tag color="purple">Requested from you</Tag>
+    },
+    { title: 'Initiated By', dataIndex: 'requestedByUserId' },
     {
       title: 'Status',
       dataIndex: 'status',
@@ -71,18 +99,18 @@ const RequestInbox: React.FC = () => {
       key: 'action',
       render: (_: unknown, record: TransferRequest) => (
         <Space>
-          <Button 
-            type="primary" 
-            size="small" 
-            onClick={() => handleAction(record.id, record.itemId, record.requestedByUserId, 'approved')}
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => handleAction(record, 'approved')}
             loading={loading}
           >
-            Approve & Transfer
+            {record.targetUserId ? 'Accept & Transfer' : 'Approve & Transfer'}
           </Button>
-          <Button 
-            danger 
-            size="small" 
-            onClick={() => handleAction(record.id, record.itemId, record.requestedByUserId, 'declined')}
+          <Button
+            danger
+            size="small"
+            onClick={() => handleAction(record, 'declined')}
             loading={loading}
           >
             Decline
