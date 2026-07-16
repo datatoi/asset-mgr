@@ -114,6 +114,7 @@ const ItemsPage: React.FC = () => {
         dataSource={items}
         columns={columns}
         rowKey="id"
+        scroll={{ x: 'max-content' }}
         onRow={(record) => ({
           onClick: () => navigate(`/items/${record.id}`),
           style: { cursor: 'pointer' },
@@ -122,15 +123,15 @@ const ItemsPage: React.FC = () => {
 
       <Modal title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700}>
         <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Space align="start" size="large">
+          <Space align="start" size="large" wrap style={{ width: '100%' }}>
             <Form.Item name="imageUrl" label="Item Image"><ImageUpload folder="items" /></Form.Item>
-            <div style={{ flex: 1, minWidth: 400 }}>
+            <div style={{ flex: '1 1 260px', minWidth: 0 }}>
               <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
                 <Select showSearch optionFilterProp="children">
                   {products.map(p => <Select.Option key={p.id} value={p.id}>{p.name} ({p.gender})</Select.Option>)}
                 </Select>
               </Form.Item>
-              <Space>
+              <Space wrap>
                 <Form.Item name="size" label="Size" rules={[{ required: true }]}><Input placeholder="e.g. M, 42, 175cm" /></Form.Item>
                 <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
                   <Select style={{ width: 120 }}>

@@ -4,8 +4,22 @@
 
 body {
   margin: 0;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100svh;
+}
+
+/* Keep modals (which use fixed pixel `width` props) from overflowing on
+   narrow viewports - antd doesn't clamp this itself. */
+.ant-modal {
+  max-width: calc(100vw - 24px);
+}
+
+/* Tables scroll horizontally within their own box on narrow screens
+   instead of pushing the whole page wider. */
+.ant-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
 }

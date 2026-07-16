@@ -146,8 +146,8 @@ const ItemDetail: React.FC = () => {
             <img src={item.imageUrl} alt="item" style={{ width: '100%', borderRadius: 8 }} />
           </Col>
           <Col md={16}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <Title level={2}>Item Details</Title>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <Title level={2} style={{ margin: 0 }}>Item Details</Title>
               {!isAdmin && item.holderId !== user?.uid && (
                 <Button
                   type="primary"
@@ -160,10 +160,10 @@ const ItemDetail: React.FC = () => {
                 </Button>
               )}
               {!isAdmin && isHolderOrOwner && (
-                <Space>
+                <Space wrap>
                   <Select
                     placeholder="Transfer to..."
-                    style={{ width: 200 }}
+                    style={{ width: 200, maxWidth: '100%' }}
                     value={transferTarget}
                     onChange={setTransferTarget}
                     showSearch
@@ -193,7 +193,7 @@ const ItemDetail: React.FC = () => {
                 {isAdmin ? (
                   <Select
                     value={item.holderId}
-                    style={{ width: 240 }}
+                    style={{ width: 240, maxWidth: '100%' }}
                     loading={changingHolder}
                     onChange={handleChangeHolder}
                   >
@@ -210,7 +210,7 @@ const ItemDetail: React.FC = () => {
                     value={item.ownerId}
                     placeholder="Unassigned"
                     allowClear
-                    style={{ width: 240 }}
+                    style={{ width: 240, maxWidth: '100%' }}
                     onChange={(value) => handleChangeOwner(value ?? null)}
                   >
                     {members.map(m => <Select.Option key={m.id} value={m.id}>{m.name}</Select.Option>)}
@@ -260,7 +260,7 @@ const ItemDetail: React.FC = () => {
                 {
                   key: '2',
                   label: 'History',
-                  children: <Table dataSource={history} columns={historyColumns} rowKey="id" pagination={false} />,
+                  children: <Table dataSource={history} columns={historyColumns} rowKey="id" pagination={false} scroll={{ x: 'max-content' }} />,
                 },
               ]}
             />

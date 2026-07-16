@@ -46,7 +46,7 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div style={{ padding: 24, display: 'flex', justifyContent: 'center' }}>
-      <Card style={{ width: 600 }}>
+      <Card style={{ width: 600, maxWidth: '100%' }}>
         <Title level={2}>My Profile</Title>
         <Form
           form={form}

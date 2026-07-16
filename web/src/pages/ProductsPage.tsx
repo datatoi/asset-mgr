@@ -127,7 +127,7 @@ const ProductsPage: React.FC = () => {
         <h2>Products</h2>
         <Button type="primary" onClick={handleAdd}>Add Product</Button>
       </div>
-      <Table dataSource={products} columns={columns} rowKey="id" />
+      <Table dataSource={products} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
       <Modal
         title={editingProduct ? "Edit Product" : "Add Product"}

@@ -63,25 +63,25 @@ const Dashboard: React.FC = () => {
           <Space wrap>
             <LinkOutlined />
             <Text strong>Invite link:</Text>
-            <Text code copyable={false} style={{ maxWidth: 400 }} ellipsis>{inviteLink}</Text>
+            <Text code copyable={false} style={{ maxWidth: '60vw' }} ellipsis>{inviteLink}</Text>
             <Button size="small" icon={<CopyOutlined />} onClick={handleCopyInvite}>Copy</Button>
             <Text type="secondary">New members joining via this link get the "user" role — promote them from Members.</Text>
           </Space>
         </Card>
       )}
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title level={2}>Inventory Dashboard</Title>
-        <Space>
+      <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center' }}>
+        <Title level={2} style={{ margin: 0 }}>Inventory Dashboard</Title>
+        <Space wrap>
           <Input
             placeholder="Search items..."
             prefix={<SearchOutlined />}
             onChange={e => setFilters({ ...filters, search: e.target.value })}
-            style={{ width: 250 }}
+            style={{ width: 200 }}
           />
           <Select
             placeholder="Category"
             allowClear
-            style={{ width: 150 }}
+            style={{ width: 140 }}
             onChange={val => setFilters({ ...filters, categoryId: val })}
           >
             {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
@@ -89,7 +89,7 @@ const Dashboard: React.FC = () => {
           <Select
             placeholder="Product"
             allowClear
-            style={{ width: 150 }}
+            style={{ width: 140 }}
             onChange={val => setFilters({ ...filters, productId: val })}
           >
             {products.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}

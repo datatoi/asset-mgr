@@ -42,7 +42,13 @@
       "Bash(firebase functions:log --project dressmanager-540ba --only transferItem -n 20)",
       "Bash(curl -s https://dressmanager-540ba.web.app/)",
       "Bash(grep -rn \"/items/\\\\${\" /Users/edgars/ws/asset-mgr/web/src/)",
-      "Bash(firebase functions:log --project dressmanager-540ba --only transferItem -n 100)"
+      "Bash(firebase functions:log --project dressmanager-540ba --only transferItem -n 100)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(node -e \"require.resolve\\('playwright'\\)\")",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(npm ls *)",
+      "Bash(pkill -f \"vite\")"
     ],
     "additionalDirectories": [
       "/private/tmp/claude-501/-Users-edgars-ws-asset-mgr/a56b19e9-c6ee-42b8-9e92-05f63bb071a0/scratchpad"

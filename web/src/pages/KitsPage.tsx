@@ -114,7 +114,7 @@ const KitsPage: React.FC = () => {
         <h2>Costume Kits (Sets)</h2>
         {isAdmin && <Button type="primary" onClick={() => { setEditingKit(null); form.resetFields(); setIsModalOpen(true); }}>Define Kit</Button>}
       </div>
-      <Table dataSource={kits} columns={columns} rowKey="id" />
+      <Table dataSource={kits} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
       <Modal title="Kit Definition" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
         <Form form={form} layout="vertical" onFinish={onFinish}>

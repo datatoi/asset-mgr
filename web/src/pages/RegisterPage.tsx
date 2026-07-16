@@ -31,8 +31,8 @@ const RegisterPage: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', padding: '50px 0', background: '#f0f2f5' }}>
-      <Content style={{ display: 'flex', justifyContent: 'center' }}>
-        <Card style={{ width: 500, borderRadius: 8 }}>
+      <Content style={{ display: 'flex', justifyContent: 'center', width: '100%', padding: '0 16px', boxSizing: 'border-box' }}>
+        <Card style={{ width: 500, maxWidth: '100%', borderRadius: 8 }}>
           <Title level={3} style={{ textAlign: 'center' }}>Setup Your Organization</Title>
           <Form layout="vertical" onFinish={onFinish}>
             <Form.Item label="Organization Name" name="orgName" rules={[{ required: true }]}>

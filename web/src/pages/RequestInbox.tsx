@@ -124,7 +124,7 @@ const RequestInbox: React.FC = () => {
     <div style={{ padding: 24 }}>
       <Card>
         <Title level={2}>Pending Requests</Title>
-        <Table dataSource={requests} columns={columns} rowKey="id" />
+        <Table dataSource={requests} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
       </Card>
     </div>
   );

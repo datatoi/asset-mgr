@@ -82,7 +82,7 @@ const MembersPage: React.FC = () => {
     <div style={{ padding: 24 }}>
       <Card>
         <Title level={2}>Member Management</Title>
-        <Table dataSource={members} columns={columns} rowKey="id" />
+        <Table dataSource={members} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
       </Card>
     </div>
   );

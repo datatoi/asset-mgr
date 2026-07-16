@@ -23,8 +23,8 @@ const LoginPage: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5' }}>
-      <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <Card style={{ width: 400, textAlign: 'center', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '0 16px', boxSizing: 'border-box' }}>
+        <Card style={{ width: 400, maxWidth: '100%', textAlign: 'center', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             <Title level={2}>Dress Asset Management</Title>
             <Text type="secondary">Manage your organization's costumes with ease.</Text>

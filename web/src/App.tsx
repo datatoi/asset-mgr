@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Button } from 'antd';
 import {
   DashboardOutlined,
   SkinOutlined,
@@ -8,7 +8,9 @@ import {
   TagsOutlined,
   UserOutlined,
   InboxOutlined,
-  TeamOutlined
+  TeamOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined
 } from '@ant-design/icons';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
@@ -32,6 +34,8 @@ const App: React.FC = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
 
@@ -52,7 +56,13 @@ const App: React.FC = () => {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       {showSider && (
-        <Sider breakpoint="lg" collapsedWidth="0">
+        <Sider
+          breakpoint="lg"
+          collapsedWidth="0"
+          trigger={null}
+          collapsed={collapsed}
+          onBreakpoint={(broken) => { setIsMobile(broken); setCollapsed(broken); }}
+        >
           <div style={{ height: 32, margin: 16, background: 'rgba(255, 255, 255, 0.2)', color: 'white', textAlign: 'center', lineHeight: '32px', fontWeight: 'bold' }}>
             DRESS MGR
           </div>
@@ -61,12 +71,20 @@ const App: React.FC = () => {
             mode="inline"
             selectedKeys={[location.pathname]}
             items={menuItems}
-            onClick={({ key }) => navigate(key)}
+            onClick={({ key }) => { navigate(key); if (isMobile) setCollapsed(true); }}
           />
         </Sider>
       )}
       <Layout>
-        {showSider && <Header style={{ background: '#fff', padding: 0 }} />}
+        {showSider && (
+          <Header style={{ background: '#fff', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
+            <Button
+              type="text"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={() => setCollapsed(!collapsed)}
+            />
+          </Header>
+        )}
         <Content style={{ margin: '24px 16px 0' }}>
           <Routes>
             <Route path="/login" element={<Login />} />

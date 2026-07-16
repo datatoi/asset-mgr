@@ -121,6 +121,14 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       `transferItem`, decline is a direct client update restricted by rules
 - [x] Cloud Function: on approve → update `holderId`, append `holderHistory`,
       mark request `transferred` — `transferItem`
+- [x] Fixed a real production bug (not just an emulator quirk, confirmed via
+      `firebase functions:log`): `transferItem` threw `INTERNAL` for any item
+      created before `groupId` became a required field, since its
+      `holderHistory` write includes `groupId: itemData.groupId`, and the
+      Admin SDK - unlike the client SDK, which already has
+      `ignoreUndefinedProperties: true` (`web/src/lib/firebase.ts`) - rejects
+      `undefined` field values outright. Added the same setting to the Admin
+      SDK's Firestore instance in `functions/src/index.ts`.
 - [x] Admin direct transfer (change holder, auto-logged) — `ItemDetail` shows
       Holder as a dropdown (any subscription member, or "Storage") for
       admin/superadmin, calling `transferItem` with `transferType: 'admin'`

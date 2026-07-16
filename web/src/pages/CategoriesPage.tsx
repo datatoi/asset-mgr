@@ -102,7 +102,7 @@ const CategoriesPage: React.FC = () => {
         <h2>Categories</h2>
         <Button type="primary" onClick={handleAdd}>Add Category</Button>
       </div>
-      <Table dataSource={categories} columns={columns} rowKey="id" />
+      <Table dataSource={categories} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
       <Modal
         title={editingCategory ? "Edit Category" : "Add Category"}

@@ -39,8 +39,8 @@ const JoinPage: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5' }}>
-      <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        <Card style={{ width: 420, textAlign: 'center', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '0 16px', boxSizing: 'border-box' }}>
+        <Card style={{ width: 420, maxWidth: '100%', textAlign: 'center', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
           {loading ? null : joinedName ? (
             <Result
               status="success"

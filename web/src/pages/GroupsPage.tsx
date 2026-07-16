@@ -54,7 +54,7 @@ const GroupsPage: React.FC = () => {
           <Button type="primary" onClick={() => setIsModalOpen(true)}>Add Group</Button>
         )}
       </div>
-      <Table dataSource={groups} columns={columns} rowKey="id" />
+      <Table dataSource={groups} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
       <Modal
         title="Add Group"
