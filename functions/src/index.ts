@@ -207,7 +207,8 @@ export const createGroup = onCall(async (request) => {
 
 /**
  * Transfers an item to a new holder. Callable by the current holder (self
- * hand-over) or by an admin/superadmin of the item's group.
+ * hand-over), the recipient accepting a pending push transfer offer, or by
+ * an admin/superadmin of the item's group.
  */
 export const transferItem = onCall(async (request) => {
   const {auth} = request;
@@ -215,7 +216,7 @@ export const transferItem = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "User must be authenticated.");
   }
 
-  const {itemId, newHolderId, transferType, requestId} = request.data;
+  const {itemId, newHolderId, transferType, transferId} = request.data;
   if (!itemId || !newHolderId || !transferType) {
     throw new HttpsError("invalid-argument", "Missing required parameters.");
   }
@@ -250,14 +251,14 @@ export const transferItem = onCall(async (request) => {
   // Holder/owner-initiated "push" transfers (ItemDetail's "Transfer to..."
   // control) name a specific recipient who must accept before the item
   // moves - that recipient is neither the admin nor the current holder, so
-  // check the pending request names them as its target.
-  if (!isAuthorized && requestId) {
-    const requestDoc = await db.collection("requests").doc(requestId).get();
-    const requestData = requestDoc.data();
+  // check the pending transfer names them as its target.
+  if (!isAuthorized && transferId) {
+    const transferDoc = await db.collection("transfers").doc(transferId).get();
+    const transferData = transferDoc.data();
     if (
-      requestData?.itemId === itemId &&
-      requestData?.status === "pending" &&
-      requestData?.targetUserId === auth.uid
+      transferData?.itemId === itemId &&
+      transferData?.status === "pending" &&
+      transferData?.targetUserId === auth.uid
     ) {
       isAuthorized = true;
     }
@@ -289,9 +290,9 @@ export const transferItem = onCall(async (request) => {
     groupId: groupId,
   });
 
-  if (requestId) {
-    const requestRef = db.collection("requests").doc(requestId);
-    batch.update(requestRef, {
+  if (transferId) {
+    const transferRef = db.collection("transfers").doc(transferId);
+    batch.update(transferRef, {
       status: "transferred",
       transferredAt: admin.firestore.FieldValue.serverTimestamp(),
     });
@@ -300,7 +301,7 @@ export const transferItem = onCall(async (request) => {
   await batch.commit();
   logger.info(
     `Item ${itemId} transferred to ${newHolderId} by ${auth.uid}` +
-    `${requestId ? ` (Req: ${requestId})` : ""}`
+    `${transferId ? ` (Transfer: ${transferId})` : ""}`
   );
 
   return {success: true};
@@ -339,7 +340,7 @@ export const requestKit = onCall(async (request) => {
   const userSizes: Record<string, string> = userData.sizes || {};
 
   const batch = db.batch();
-  const requestsCreated: string[] = [];
+  const transfersCreated: string[] = [];
 
   for (const productId of productIds) {
     // Sizes are per-category (a shoe size and a dress size aren't the same
@@ -374,8 +375,8 @@ export const requestKit = onCall(async (request) => {
       );
     }
 
-    const reqRef = db.collection("requests").doc();
-    batch.set(reqRef, {
+    const transferRef = db.collection("transfers").doc();
+    batch.set(transferRef, {
       subscriptionId,
       groupId,
       itemId: availableItem.id,
@@ -385,16 +386,16 @@ export const requestKit = onCall(async (request) => {
       status: "pending",
       requestedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
-    requestsCreated.push(reqRef.id);
+    transfersCreated.push(transferRef.id);
   }
 
   await batch.commit();
   logger.info(
     `Kit ${kitId} requested by ${auth.uid}. ` +
-    `Created ${requestsCreated.length} requests.`
+    `Created ${transfersCreated.length} transfers.`
   );
 
-  return {success: true, requestIds: requestsCreated};
+  return {success: true, transferIds: transfersCreated};
 });
 
 /**

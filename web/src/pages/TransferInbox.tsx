@@ -8,40 +8,41 @@ import type { TransferRequest } from '../types/models';
 
 const { Title } = Typography;
 
-const RequestInbox: React.FC = () => {
+const TransferInbox: React.FC = () => {
   const { user, userData } = useAuth();
-  const [requests, setRequests] = useState<TransferRequest[]>([]);
+  const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
 
-    // Admin sees all pending. A regular user sees requests where they need to
-    // act: either they're the current holder being asked to release the item
-    // (the "pull" flow), or they're the named recipient of a holder/owner-
-    // initiated "push" transfer offer (ItemDetail's "Transfer to..." control).
+    // Admin sees all pending. A regular user sees transfers where they need
+    // to act: either they're the current holder being asked to release the
+    // item (the "pull" flow), or they're the named recipient of a
+    // holder/owner-initiated "push" transfer offer (ItemDetail's
+    // "Transfer to..." control).
     const isAdmin = Object.values(userData.groups || {}).some(r => r === 'admin' || r === 'superadmin');
 
     if (isAdmin) {
-      const q = query(collection(db, 'requests'), where('subscriptionId', '==', userData.subscriptionId), where('status', '==', 'pending'));
+      const q = query(collection(db, 'transfers'), where('subscriptionId', '==', userData.subscriptionId), where('status', '==', 'pending'));
       const unsubscribe = onSnapshot(q, (snap) => {
-        setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransferRequest)));
+        setTransfers(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransferRequest)));
       });
       return () => unsubscribe();
     }
 
     const asHolder = new Map<string, TransferRequest>();
     const asTarget = new Map<string, TransferRequest>();
-    const merge = () => setRequests([...asHolder.values(), ...asTarget.values()].filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i));
+    const merge = () => setTransfers([...asHolder.values(), ...asTarget.values()].filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i));
 
-    const qHolder = query(collection(db, 'requests'), where('currentHolderId', '==', user?.uid), where('status', '==', 'pending'));
+    const qHolder = query(collection(db, 'transfers'), where('currentHolderId', '==', user?.uid), where('status', '==', 'pending'));
     const unsubHolder = onSnapshot(qHolder, (snap) => {
       asHolder.clear();
       snap.docs.forEach(d => asHolder.set(d.id, { id: d.id, ...d.data() } as TransferRequest));
       merge();
     });
 
-    const qTarget = query(collection(db, 'requests'), where('targetUserId', '==', user?.uid), where('status', '==', 'pending'));
+    const qTarget = query(collection(db, 'transfers'), where('targetUserId', '==', user?.uid), where('status', '==', 'pending'));
     const unsubTarget = onSnapshot(qTarget, (snap) => {
       asTarget.clear();
       snap.docs.forEach(d => asTarget.set(d.id, { id: d.id, ...d.data() } as TransferRequest));
@@ -60,19 +61,19 @@ const RequestInbox: React.FC = () => {
           itemId: record.itemId,
           newHolderId: record.targetUserId || record.requestedByUserId,
           transferType: 'request',
-          requestId: record.id // Pass requestId to handle status update in Cloud Function
+          transferId: record.id // Pass transferId to handle status update in Cloud Function
         });
         message.success('Item transferred!');
       } else {
-        await updateDoc(doc(db, 'requests', record.id), {
+        await updateDoc(doc(db, 'transfers', record.id), {
           status: 'declined',
           declinedAt: serverTimestamp()
         });
-        message.success('Request declined');
+        message.success('Transfer declined');
       }
     } catch (error) {
       console.error(error);
-      message.error('Failed to process request');
+      message.error('Failed to process transfer');
     } finally {
       setLoading(false);
     }
@@ -123,11 +124,11 @@ const RequestInbox: React.FC = () => {
   return (
     <div style={{ padding: 24 }}>
       <Card>
-        <Title level={2}>Pending Requests</Title>
-        <Table dataSource={requests} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
+        <Title level={2}>Pending Transfers</Title>
+        <Table dataSource={transfers} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
       </Card>
     </div>
   );
 };
 
-export default RequestInbox;
+export default TransferInbox;

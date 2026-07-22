@@ -160,8 +160,9 @@ admin/superadmin on the Item Detail view.
 *   `kits/{kitId}` — `subscriptionId`, `groupId`, `name`, `gender`, `size`,
     `productIds` (the specific Products a complete kit requires — one of each —
     not Categories), `description`.
-*   `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
-    `currentHolderId`, `status` (`pending`|`approved`|`declined`|`transferred`),
+*   `transfers/{transferId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
+    `currentHolderId`, `targetUserId?` (holder/owner-initiated "push" transfer only),
+    `status` (`pending`|`approved`|`declined`|`transferred`),
     `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`.
 
 ## Authentication & Authorization

@@ -11,12 +11,15 @@ deploying your own instance of the app, see
 
 Every member has a role **per group**:
 
+- **Joiner** — the starting role for anyone who joins via an invite link.
+  Can only see their own Profile page — nothing else — until an admin
+  grants a real role.
 - **User** — can browse the catalog, request items/kits, comment, and view
   history. Can also transfer an item they currently hold or own to someone
   else.
 - **Admin** — everything a User can do, plus managing the catalog
-  (categories, products, items, kits) and directly changing an item's
-  holder/owner.
+  (categories, products, items, kits), Groups, and directly changing an
+  item's holder/owner.
 - **Superadmin** — everything an Admin can do, plus managing members' roles
   and creating new Groups.
 
@@ -28,8 +31,10 @@ Every member has a role **per group**:
    superadmin.
 3. **Joining an existing organization?** An admin will send you an invite
    link (`.../join/<id>`). Sign in, open the link, and you're added as a
-   `user` to every Group in that organization. An admin can promote you
-   afterward from the Members page.
+   **Joiner** in every Group in that organization. You'll only be able to
+   see your own Profile page until an admin promotes you to a real role
+   from the Members page — fill in your profile (name, gender, sizes)
+   while you wait.
 
 ## 3. Groups
 
@@ -41,24 +46,30 @@ Product, Item, and Kit belongs to exactly one Group.
 - Superadmins can click **Add Group** to create a new one (name +
   optional description). You automatically become superadmin of any group
   you create.
-- Admins/superadmins assign members to groups (and set their role in each)
-  from the **Members** page.
+- Admins/superadmins assign members to groups (and set their role in each,
+  including Joiner) from the **Members** page.
 
 ## 4. Your profile
 
 Open **Profile** to set:
 
-- **Gender** — used to match you with the right items when requesting kits.
+- **Gender** — Male or Female. Used to match you with the right items when
+  requesting kits, and to decide which Categories you see a size field for
+  below.
 - **Size per category** — a shoe size and a dress size aren't the same
   scale, so you set one size per Category (e.g. "Dress: M", "Shoes: 42").
-  Set this before requesting a kit that includes that category, or the
-  request will fail with a clear error telling you which size is missing.
+  Only categories marked Unisex, or matching your own gender, are shown —
+  set your Gender above first if the list looks empty. Set your size before
+  requesting a kit that includes that category, or the request will fail
+  with a clear error telling you which size is missing.
 
 ## 5. Building the catalog (Admin/Superadmin)
 
 The catalog is organized as **Category → Product → Item**, plus **Kits**:
 
-- **Categories** — broad groupings, e.g. "Dress", "Shoes", "Trousers".
+- **Categories** — broad groupings, e.g. "Dress", "Shoes", "Trousers". Each
+  has a Gender (Male/Female/Unisex) that controls whose Profile shows a
+  size field for it (see Your profile above).
 - **Products** — a specific variant within a category, e.g. "Red Floral
   Skirt". Has a gender and can have a photo.
 - **Items** — the actual physical pieces you own, e.g. three "Red Floral
@@ -73,7 +84,24 @@ The catalog is organized as **Category → Product → Item**, plus **Kits**:
 Every Category/Product/Item/Kit must be assigned to a **Group** when
 created.
 
-## 6. Requesting an item or kit
+## 6. Browsing and searching (Dashboard)
+
+The **Dashboard** lists items in your organization, with filters at the
+top:
+
+- **Search** — matches by product name.
+- **Category** / **Product** — Product narrows to only the selected
+  Category's products; picking a Category clears Product if it no longer
+  matches.
+- **Holder** / **Owner** — pick a specific person (or "Storage" for
+  Holder) to see only their items. **Holder defaults to you** when you
+  open the Dashboard, so it opens showing "what do I have?" — clear it to
+  browse everyone's items.
+
+Each item card shows its size, gender, and current holder at a glance;
+click one to open its detail page.
+
+## 7. Requesting an item or kit
 
 - **Browse Items** and open one you want. If it's not already yours, click
   **Request Transfer** (or **Request from Storage** if nobody currently
@@ -82,19 +110,19 @@ created.
 - **Browse Kits** and click **Request Kit** to request a full costume set
   at once. The system automatically picks one available item per required
   product matching your size and gender.
-- Track the status of your requests, and act on requests directed at you,
-  from **Requests** in the sidebar.
+- Track the status of your requests, and act on ones directed at you, from
+  **Transfers** in the sidebar.
 
-## 7. Transferring an item
+## 8. Transferring an item
 
 There are two ways an item moves from one person to another:
 
 1. **Someone requests it from you** (see above) — it shows up in your
-   **Requests** inbox as something to *Approve & Transfer* or *Decline*.
+   **Transfers** inbox as something to *Approve & Transfer* or *Decline*.
 2. **You hand it off to someone specific** — if you're the current holder
    or the owner of an item, open its detail page and use the
    **Transfer to...** picker near the top: choose a person and click
-   **Send Transfer Offer**. It appears in *their* Requests inbox as an
+   **Send Transfer Offer**. It appears in *their* Transfers inbox as an
    offer they must *Accept & Transfer* or *Decline* before it actually
    becomes theirs.
 
@@ -107,9 +135,9 @@ them reassign either directly (holder changes are still logged to
 History; owner changes are not, since owner is just long-term bookkeeping,
 separate from who physically has the item right now).
 
-## 8. Item detail page
+## 9. Item detail page
 
-Click any item (from the Items list, or via a request) to see:
+Click any item (from the Items list, Dashboard, or via a transfer) to see:
 
 - Photo, RFID tag, size, condition, description.
 - **Current Holder** / **Owner** — who has it right now vs. who it's
@@ -120,13 +148,13 @@ Click any item (from the Items list, or via a request) to see:
 - **History** — every holder change, with date, who initiated it, and how
   (request, admin override, or NFC scan).
 
-## 9. Members and roles (Admin/Superadmin)
+## 10. Members and roles (Admin/Superadmin)
 
 Open **Members** to see everyone in the organization and their role in each
-Group. Change a dropdown to promote/demote someone, or set "None" to
-remove them from a group entirely.
+Group. Change a dropdown to promote/demote someone (including granting or
+revoking Joiner), or set "None" to remove them from a group entirely.
 
-## 10. NFC mobile scanner
+## 11. NFC mobile scanner
 
 A companion mobile app is planned for tapping a garment's NFC tag to
 instantly identify it and do a quick check-out/return — useful backstage
@@ -141,3 +169,5 @@ ships, it will sign in with the same account you use on the web app.
   return an item of that product/size/gender to Storage before the kit can
   be fulfilled.
 - "Storage" as a holder means the item isn't checked out — it's available.
+- Just joined via an invite link and only see a Profile page? That's
+  expected — you're a Joiner until an admin grants you a role.

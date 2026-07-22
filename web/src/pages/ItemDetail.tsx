@@ -63,7 +63,7 @@ const ItemDetail: React.FC = () => {
     if (!id || !user || !userData || !item) return;
     setRequesting(true);
     try {
-      await addDoc(collection(db, 'requests'), {
+      await addDoc(collection(db, 'transfers'), {
         subscriptionId: userData.subscriptionId,
         groupId: item.groupId,
         itemId: id,
@@ -84,7 +84,7 @@ const ItemDetail: React.FC = () => {
     if (!id || !user || !userData || !item || !transferTarget) return;
     setSendingTransfer(true);
     try {
-      await addDoc(collection(db, 'requests'), {
+      await addDoc(collection(db, 'transfers'), {
         subscriptionId: userData.subscriptionId,
         groupId: item.groupId,
         itemId: id,

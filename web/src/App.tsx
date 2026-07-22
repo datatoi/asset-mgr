@@ -24,7 +24,7 @@ import CategoriesPage from './pages/CategoriesPage';
 import ProductsPage from './pages/ProductsPage';
 import KitsPage from './pages/KitsPage';
 import ProfilePage from './pages/ProfilePage';
-import RequestInbox from './pages/RequestInbox';
+import TransferInbox from './pages/TransferInbox';
 import MembersPage from './pages/MembersPage';
 import GroupsPage from './pages/GroupsPage';
 
@@ -51,7 +51,7 @@ const App: React.FC = () => {
     { key: '/categories', icon: <GroupOutlined />, label: 'Categories' },
     { key: '/products', icon: <TagsOutlined />, label: 'Products' },
     { key: '/kits', icon: <InboxOutlined />, label: 'Kits' },
-    { key: '/requests', icon: <InboxOutlined />, label: 'Requests' },
+    { key: '/transfers', icon: <InboxOutlined />, label: 'Transfers' },
     ...(isAdmin ? [{ key: '/members', icon: <UserOutlined />, label: 'Members' }] : []),
     ...(isAdmin ? [{ key: '/groups', icon: <TeamOutlined />, label: 'Groups' }] : []),
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
@@ -102,7 +102,7 @@ const App: React.FC = () => {
             <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
             <Route path="/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
-            <Route path="/requests" element={<ProtectedRoute><RequestInbox /></ProtectedRoute>} />
+            <Route path="/transfers" element={<ProtectedRoute><TransferInbox /></ProtectedRoute>} />
             <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
             <Route path="/groups" element={<ProtectedRoute><GroupsPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />

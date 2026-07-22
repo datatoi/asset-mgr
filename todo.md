@@ -140,7 +140,20 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       needed since Dashboard filters client-side; revisit if/when filtering
       moves server-side (`where` queries on category/product/size together)
 
-## Phase 4 — Requests & transfers
+## Phase 4 — Transfers
+
+Renamed throughout from "Requests" to "Transfers" — `requests` Firestore
+collection → `transfers`, `RequestInbox.tsx` → `TransferInbox.tsx`
+(`/requests` route → `/transfers`, nav label "Requests" → "Transfers"),
+`requestId` param/field on `transferItem` → `transferId`, `firestore.rules`
+`match /requests/{reqId}` → `match /transfers/{transferId}`. Rationale: every
+document here represents a holder change, initiated by either side (a
+non-holder requesting an item, or the holder/owner pushing it to someone) —
+"request" only described the first case. No migration needed (dev-only, no
+existing `requests` documents at rename time). The `TransferRequest` TS type
+name and `requestedByUserId`/`currentHolderId`/`targetUserId` field names
+were kept as-is (already accurate/unambiguous).
+
 - [x] "Request kit" button → Cloud Function (`requestKit`) auto-picks
       available items by size/gender per required product; fails with
       `failed-precondition` if a product has none available

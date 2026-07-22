@@ -96,11 +96,16 @@ Catalog hierarchy: **Category → Product → Item**, plus **Kit** (checkout uni
   not Categories; e.g. "Red Dress" + "Black Shoes", not "Dress" + "Shoes"),
   `description` — no flat `size` field; fulfillment matches per-category
   against the requester's `sizes` map (see Kit request / checkout below)
-- `requests/{reqId}` — `subscriptionId`, `itemId`, `kitId?`, `requestedByUserId`,
-  `currentHolderId`, `targetUserId?` (set only for a holder/owner-initiated
-  "push" transfer — see Kit request / checkout below), `status`
-  (`pending`|`approved`|`declined`|`transferred`), `requestedAt`,
-  `approvedAt?`, `declinedAt?`, `transferredAt?`
+- `transfers/{transferId}` — `subscriptionId`, `itemId`, `kitId?`,
+  `requestedByUserId` (the initiator — the requester in a "pull", or the
+  holder/owner in a "push"), `currentHolderId`, `targetUserId?` (set only
+  for a holder/owner-initiated "push" transfer — see Kit request / checkout
+  below), `status` (`pending`|`approved`|`declined`|`transferred`),
+  `requestedAt`, `approvedAt?`, `declinedAt?`, `transferredAt?`. Named
+  `transfers` (not `requests`) because every document here represents a
+  holder change in progress, regardless of which side initiated it — the
+  `TransferRequest` TS type already used this name before the collection
+  itself did.
 
 ### Owner vs Holder
 Both are **people**. `ownerId` = long-term assigned person; `holderId` = who
@@ -109,7 +114,7 @@ physically has it right now. **History tracks holder changes** (`holderHistory`)
 
 Both are editable by `admin`/`superadmin` on `ItemDetail` via dropdowns. They
 go through different paths: **holder** always calls the `transferItem` Cloud
-Function (`transferType: 'admin'`, no `requestId`) so it's logged to
+Function (`transferType: 'admin'`, no `transferId`) so it's logged to
 `holderHistory` the same as a request-approval transfer; **owner** is a plain
 direct `updateDoc` (allowed by rules — only `holderId`/`subscriptionId` are
 blocked from direct client writes on `items`), since it's not part of the
@@ -148,20 +153,20 @@ available items.
   required product's category, looks up the requester's `sizes[categoryId]`
   (rejecting with a clear error if not set), then **auto-picks an available
   item** of that product matching that size and the user's **gender**, fails
-  gracefully if none available → generates per-item requests.
+  gracefully if none available → generates one `transfers` doc per item.
 - **Approval ("pull")**: a non-holder requests an item from `ItemDetail`
   (`requestedByUserId` = requester, no `targetUserId`); the current holder (or
   admin) approves/declines. On approval, backend updates `holderId`, appends
-  `holderHistory`, marks request `transferred`.
+  `holderHistory`, marks the transfer `transferred`.
 - **Transfer offer ("push")**: the current holder or the owner picks a
   specific person from `ItemDetail`'s "Transfer to..." control and sends them
   a transfer offer (`requestedByUserId` = holder/owner who initiated it,
   `targetUserId` = offered recipient). It appears in the recipient's
-  `RequestInbox`; they must accept before `holderId` changes — the backend
-  authorizes this by checking that the caller matches the pending request's
+  `TransferInbox`; they must accept before `holderId` changes — the backend
+  authorizes this by checking that the caller matches the pending transfer's
   `targetUserId` (they're neither the item's current holder nor necessarily
   an admin, so `transferItem`'s normal holder/admin check alone wouldn't
-  allow it). Declining just marks the request `declined`, same as the pull flow.
+  allow it). Declining just marks the transfer `declined`, same as the pull flow.
 - **Admin transfer**: admin/superadmin changes `holderId` directly; backend logs it.
 - **NFC scan**: tap tag → resolve `itemId` → show item → optional quick transfer.
 
@@ -179,7 +184,7 @@ available items.
 ## Status
 Core web app scaffolded and functional (Firebase project, auth, subscription
 onboarding, catalog CRUD, dashboard, item detail with comments/history,
-kit/item requests, request inbox, member/role management, group management,
+kit/item transfer requests, transfer inbox, member/role management, group management,
 security rules).
 Mobile NFC scanner not started (draft-only reference in `mobile/App.tsx`, has
 known issues — see [mobile/README.md](mobile/README.md)). See [todo.md](todo.md)

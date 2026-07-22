@@ -33,7 +33,7 @@ Two client surfaces share one Firebase backend and one Firestore data model.
 ```
 
 - **`web/`** is the primary app: subscription/group setup, catalog CRUD
-  (categories/products/items/kits), member management, browsing, requests,
+  (categories/products/items/kits), member management, browsing, transfers,
   transfers. Deployed to **Firebase Hosting**.
 - **`mobile/`** is intentionally thin: tap an NFC tag → resolve `itemId` →
   show the item → one quick action. Not built yet (Phase 6) because it needs a
@@ -103,9 +103,9 @@ asset-mgr/
 │       │   ├── CategoriesPage.tsx    Category CRUD (admin)
 │       │   ├── ProductsPage.tsx      Product CRUD + image (admin)
 │       │   ├── ItemsPage.tsx         Item CRUD + image + rfidTag (admin)
-│       │   ├── ItemDetail.tsx        Item view: Comments tab, Holder History tab, request button
+│       │   ├── ItemDetail.tsx        Item view: Comments tab, Holder History tab, request/transfer buttons
 │       │   ├── KitsPage.tsx          Kit CRUD (admin) + "Request Kit" (user, calls requestKit)
-│       │   ├── RequestInbox.tsx      Approve (calls transferItem) / decline pending requests
+│       │   ├── TransferInbox.tsx     Approve/accept (calls transferItem) / decline pending transfers
 │       │   ├── MembersPage.tsx       Per-group role assignment (calls assignRole)
 │       │   └── ProfilePage.tsx       Edit own size/gender/avatar
 │       └── assets/                   Static assets
@@ -127,7 +127,7 @@ asset-mgr/
 
 Landed so far (see [todo.md](todo.md) for exact phase status): subscription
 onboarding, full catalog CRUD, dashboard browsing, item detail with
-comments/history, kit and item requests, request inbox, member/role management,
+comments/history, kit and item transfer requests, transfer inbox, member/role management,
 Firestore + Storage security rules. Still ahead:
 
 - Composite Firestore indexes once filtering moves server-side (Dashboard

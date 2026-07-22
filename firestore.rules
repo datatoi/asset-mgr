@@ -94,10 +94,10 @@ service cloud.firestore {
       allow write: if isAuthenticated() && isAnyAdmin();
     }
 
-    match /requests/{reqId} {
+    match /transfers/{transferId} {
       allow read: if isAuthenticated() && belongsToSub(resource.data);
       allow create: if isAuthenticated();
-      // Clients may only decline a pending request (requester cancelling, the
+      // Clients may only decline a pending transfer (requester cancelling, the
       // current holder/admin turning it down, or - for a holder/owner-
       // initiated push transfer - the offered recipient turning it down),
       // changing status+declinedAt and nothing else. Approval always goes

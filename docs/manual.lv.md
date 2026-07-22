@@ -13,12 +13,15 @@ superadministratoriem. Ja izvietojat savu lietotnes instanci, skatiet
 
 Katram dalībniekam ir loma **katrā grupā atsevišķi**:
 
+- **Pievienotājs (Joiner)** — sākotnējā loma ikvienam, kas pievienojas caur
+  ielūguma saiti. Var redzēt tikai savu Profila lapu — neko citu —, kamēr
+  administrators nepiešķir īstu lomu.
 - **Lietotājs (User)** — var pārlūkot katalogu, pieprasīt priekšmetus un
   komplektus, pievienot komentārus un skatīt vēsturi. Var arī nodot tālāk
   priekšmetu, kas šobrīd ir viņa rokās vai īpašumā, citam cilvēkam.
 - **Administrators (Admin)** — viss, ko var Lietotājs, kā arī kataloga
-  pārvaldība (kategorijas, produkti, priekšmeti, komplekti) un tiešā
-  priekšmeta turētāja/īpašnieka maiņa.
+  pārvaldība (kategorijas, produkti, priekšmeti, komplekti), grupas un
+  tiešā priekšmeta turētāja/īpašnieka maiņa.
 - **Superadministrators (Superadmin)** — viss, ko var Administrators, kā
   arī dalībnieku lomu pārvaldība un jaunu grupu izveide.
 
@@ -30,8 +33,11 @@ Katram dalībniekam ir loma **katrā grupā atsevišķi**:
    superadministratoru.
 3. **Pievienojaties esošai organizācijai?** Administrators atsūtīs jums
    ielūguma saiti (`.../join/<id>`). Pierakstieties, atveriet saiti, un
-   jūs tiksiet pievienots kā `user` visās šīs organizācijas grupās.
-   Administrators vēlāk var jūs paaugstināt no Dalībnieku (Members) lapas.
+   jūs tiksiet pievienots kā **Pievienotājs (Joiner)** visās šīs
+   organizācijas grupās. Jūs varēsiet redzēt tikai savu Profila lapu,
+   kamēr administrators jūs nepaaugstinās uz īstu lomu Dalībnieku
+   (Members) lapā — kamēr gaidāt, aizpildiet savu profilu (vārdu, dzimumu,
+   izmērus).
 
 ## 3. Grupas
 
@@ -44,19 +50,23 @@ produkts, priekšmets un komplekts pieder tieši vienai grupai.
   izveidotu jaunu (nosaukums + neobligāts apraksts). Izveidojot grupu, jūs
   automātiski kļūstat par tās superadministratoru.
 - Administratori/superadministratori piesaista dalībniekus grupām (un
-  nosaka viņu lomu katrā no tām) **Members (Dalībnieki)** lapā.
+  nosaka viņu lomu katrā no tām, tostarp Pievienotāja lomu) **Members
+  (Dalībnieki)** lapā.
 
 ## 4. Jūsu profils
 
 Atveriet **Profile (Profils)**, lai iestatītu:
 
-- **Dzimums (Gender)** — izmanto, lai pieprasot komplektus, jums piemeklētu
-  atbilstošus priekšmetus.
+- **Dzimums (Gender)** — Vīrietis vai Sieviete. Izmanto, lai pieprasot
+  komplektus, jums piemeklētu atbilstošus priekšmetus, kā arī lai noteiktu,
+  kurām kategorijām zemāk redzēsiet izmēra lauku.
 - **Izmērs katrai kategorijai** — kurpju izmērs un kleitas izmērs nav viena
   un tā pati skala, tāpēc katrai kategorijai norādāt savu izmēru (piem.,
-  "Kleita: M", "Kurpes: 42"). Iestatiet to pirms komplekta, kas ietver šo
-  kategoriju, pieprasīšanas — pretējā gadījumā pieprasījums neizdosies ar
-  skaidru kļūdas paziņojumu, kurā norādīts, kāda izmēra trūkst.
+  "Kleita: M", "Kurpes: 42"). Redzamas tikai tās kategorijas, kas atzīmētas
+  kā "Unisex", vai kas atbilst jūsu dzimumam — ja saraksts šķiet tukšs,
+  vispirms iestatiet dzimumu augstāk. Iestatiet izmēru pirms komplekta, kas
+  ietver šo kategoriju, pieprasīšanas — pretējā gadījumā pieprasījums
+  neizdosies ar skaidru kļūdas paziņojumu, kurā norādīts, kāda izmēra trūkst.
 
 ## 5. Kataloga veidošana (Administrators/Superadministrators)
 
@@ -64,7 +74,9 @@ Katalogs veidots pēc principa **Kategorija → Produkts → Priekšmets**, kā
 arī **Komplekti**:
 
 - **Kategorijas (Categories)** — plaši iedalījumi, piem., "Kleita",
-  "Kurpes", "Bikses".
+  "Kurpes", "Bikses". Katrai ir dzimums (Vīrietis/Sieviete/Unisex), kas
+  nosaka, kuru dalībnieku Profilā tā rādās kā izmēra lauks (skat. "Jūsu
+  profils" augstāk).
 - **Produkti (Products)** — konkrēts variants kategorijas ietvaros, piem.,
   "Sarkans ziedu raksta svārki". Tam ir dzimums un var būt fotoattēls.
 - **Priekšmeti (Items)** — reāli fiziski gabali, kas jums pieder, piem.,
@@ -80,7 +92,25 @@ arī **Komplekti**:
 Katrai kategorijai, produktam, priekšmetam un komplektam, to izveidojot,
 jāpiešķir **grupa**.
 
-## 6. Priekšmeta vai komplekta pieprasīšana
+## 6. Pārlūkošana un meklēšana (Dashboard)
+
+**Dashboard (Panelis)** rāda jūsu organizācijas priekšmetu sarakstu ar
+filtriem augšpusē:
+
+- **Search (Meklēt)** — meklē pēc produkta nosaukuma.
+- **Category (Kategorija)** / **Product (Produkts)** — Produkta izvēlne
+  sašaurinās tikai uz izvēlētās kategorijas produktiem; mainot kategoriju,
+  produkta izvēle tiek notīrīta, ja tā vairs neatbilst.
+- **Holder (Turētājs)** / **Owner (Īpašnieks)** — izvēlieties konkrētu
+  personu (vai "Storage" turētājam), lai redzētu tikai viņa priekšmetus.
+  **Turētāja filtrs pēc noklusējuma ir jūs pats**, atverot Paneli — tas
+  vispirms parāda "kas man ir rokās?" — notīriet to, lai pārlūkotu visu
+  dalībnieku priekšmetus.
+
+Katra priekšmeta kartīte īsumā rāda izmēru, dzimumu un pašreizējo turētāju;
+noklikšķiniet uz tās, lai atvērtu detalizēto lapu.
+
+## 7. Priekšmeta vai komplekta pieprasīšana
 
 - Atveriet **Items (Priekšmeti)** un izvēlieties vēlamo priekšmetu. Ja tas
   jau nav pie jums, nospiediet **Request Transfer (Pieprasīt nodošanu)**
@@ -92,20 +122,20 @@ jāpiešķir **grupa**.
   izvēlas pa vienam pieejamam priekšmetam katram nepieciešamajam
   produktam, kas atbilst jūsu izmēram un dzimumam.
 - Savu pieprasījumu statusu un jums adresētos pieprasījumus skatiet un
-  apstrādājiet sānjoslas sadaļā **Requests (Pieprasījumi)**.
+  apstrādājiet sānjoslas sadaļā **Transfers (Nodošanas)**.
 
-## 7. Priekšmeta nodošana citam
+## 8. Priekšmeta nodošana citam
 
 Priekšmets no viena cilvēka pie cita var nonākt divos veidos:
 
 1. **Kāds pieprasa to no jums** (skat. iepriekš) — tas parādās jūsu
-   **Requests (Pieprasījumi)** iesūtnē kā kaut kas, ko var *Apstiprināt un
+   **Transfers (Nodošanas)** iesūtnē kā kaut kas, ko var *Apstiprināt un
    nodot (Approve & Transfer)* vai *Noraidīt (Decline)*.
 2. **Jūs nododat to konkrētam cilvēkam** — ja esat priekšmeta pašreizējais
    turētājs vai īpašnieks, atveriet tā detalizēto lapu un izmantojiet
    izvēlni **Transfer to... (Nodot...)** lapas augšdaļā: izvēlieties
    personu un nospiediet **Send Transfer Offer (Nosūtīt piedāvājumu)**.
-   Tas parādās *šīs personas* Pieprasījumu iesūtnē kā piedāvājums, kas
+   Tas parādās *šīs personas* Nodošanu iesūtnē kā piedāvājums, kas
    viņam/viņai jāpieņem (*Accept & Transfer / Pieņemt un nodot*) vai
    jānoraida (*Decline / Noraidīt*), pirms priekšmets tiešām kļūst viņa
    rīcībā.
@@ -121,10 +151,10 @@ tiešā veidā (turētāja maiņas joprojām tiek ierakstītas Vēsturē; īpaš
 maiņas — nē, jo īpašnieks ir tikai ilgtermiņa uzskaite, atsevišķi no tā,
 kam priekšmets fiziski pieder šobrīd).
 
-## 8. Priekšmeta detalizētā lapa
+## 9. Priekšmeta detalizētā lapa
 
-Noklikšķinot uz jebkura priekšmeta (Priekšmetu sarakstā vai caur
-pieprasījumu), redzēsiet:
+Noklikšķinot uz jebkura priekšmeta (Priekšmetu sarakstā, Panelī vai caur
+nodošanu), redzēsiet:
 
 - Fotoattēlu, RFID birku, izmēru, stāvokli, aprakstu.
 - **Current Holder (Pašreizējais turētājs)** / **Owner (Īpašnieks)** — kam
@@ -137,14 +167,14 @@ pieprasījumu), redzēsiet:
   ierosinājis un kā (pieprasījums, administratora tiešā maiņa vai NFC
   skenēšana).
 
-## 9. Dalībnieki un lomas (Administrators/Superadministrators)
+## 10. Dalībnieki un lomas (Administrators/Superadministrators)
 
 Atveriet **Members (Dalībnieki)**, lai redzētu visus organizācijas
 dalībniekus un viņu lomu katrā grupā. Mainiet izvēlni, lai paaugstinātu vai
-pazeminātu kāda lomu, vai izvēlieties "None", lai izslēgtu dalībnieku no
-grupas pavisam.
+pazeminātu kāda lomu (tostarp piešķirtu vai atņemtu Pievienotāja lomu), vai
+izvēlieties "None", lai izslēgtu dalībnieku no grupas pavisam.
 
-## 10. NFC mobilā skenera lietotne
+## 11. NFC mobilā skenera lietotne
 
 Ir plānota papildu mobilā lietotne, kas ļaus, pieskaroties apģērba NFC
 birkai, to uzreiz identificēt un ātri veikt izņemšanu/atgriešanu — noderīgi
@@ -162,3 +192,6 @@ tīmekļa lietotnē.
   Noliktavā, lai komplektu varētu izpildīt.
 - "Storage" (Noliktava) kā turētājs nozīmē, ka priekšmets nav izņemts —
   tas ir pieejams.
+- Tikko pievienojāties caur ielūguma saiti un redzat tikai Profila lapu?
+  Tā arī jābūt — jūs esat Pievienotājs (Joiner), kamēr administrators
+  nepiešķir jums lomu.
