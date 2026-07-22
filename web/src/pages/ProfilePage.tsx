@@ -28,6 +28,11 @@ const ProfilePage: React.FC = () => {
     }
   }, [userData, form]);
 
+  // Reacts live if the user changes their gender in this same form, so the
+  // size list below updates before they've even saved.
+  const selectedGender = Form.useWatch('gender', form) ?? userData?.gender;
+  const visibleCategories = categories.filter(c => c.gender === 'unisex' || c.gender === selectedGender);
+
   const onFinish = async (values: { name?: string; avatarUrl?: string; gender?: Gender; sizes?: Record<string, string> }) => {
     if (!user) return;
     try {
@@ -70,17 +75,20 @@ const ProfilePage: React.FC = () => {
             <Select style={{ width: 120 }}>
               <Select.Option value="male">Male</Select.Option>
               <Select.Option value="female">Female</Select.Option>
-              <Select.Option value="unisex">Unisex</Select.Option>
             </Select>
           </Form.Item>
 
           <Text strong>Sizes by category</Text>
           <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
             A shoe size and a dress size aren't the same scale — set one per category.
+            {!selectedGender && ' Set your gender above to see male/female categories (unisex ones always show).'}
           </Text>
           <Space direction="vertical" style={{ width: '100%' }}>
             {categories.length === 0 && <Text type="secondary">No categories defined yet.</Text>}
-            {categories.map(category => (
+            {categories.length > 0 && visibleCategories.length === 0 && (
+              <Text type="secondary">No categories for your gender yet.</Text>
+            )}
+            {visibleCategories.map(category => (
               <Form.Item
                 key={category.id}
                 label={category.name}

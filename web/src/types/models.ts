@@ -6,7 +6,10 @@ import type { Timestamp } from 'firebase/firestore'
 // call site (often using serverTimestamp(), which yields a FieldValue
 // sentinel) rather than conforming to these interfaces.
 
-export type Role = 'superadmin' | 'admin' | 'user'
+// 'joiner' is the default role granted by the invite-link join flow, before
+// an admin promotes them - a joiner can only see their own Profile page
+// (client-side route restriction; see ProtectedRoute).
+export type Role = 'superadmin' | 'admin' | 'user' | 'joiner'
 export type Gender = 'male' | 'female' | 'unisex'
 export type Condition = 'new' | 'good' | 'worn' | 'damaged'
 export type TransferType = 'request' | 'admin' | 'scan'
@@ -50,6 +53,10 @@ export interface Category {
   subscriptionId: string
   groupId: string
   name: string
+  // 'unisex' categories show for every user regardless of their own gender
+  // when picking a size on Profile; 'male'/'female' categories only show for
+  // users of that gender.
+  gender: Gender
 }
 
 export interface Product {

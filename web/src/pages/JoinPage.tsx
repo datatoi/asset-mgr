@@ -45,7 +45,8 @@ const JoinPage: React.FC = () => {
             <Result
               status="success"
               title={`You've joined ${joinedName}!`}
-              extra={<Button type="primary" onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>}
+              subTitle="You're in as a Joiner for now - an admin needs to grant you a role before you can access the rest of the app. Fill in your profile in the meantime."
+              extra={<Button type="primary" onClick={() => navigate('/profile')}>Go to Profile</Button>}
             />
           ) : !user ? (
             <Space direction="vertical" size="large" style={{ width: '100%' }}>

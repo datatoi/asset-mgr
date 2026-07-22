@@ -58,7 +58,13 @@ hosted-SaaS billing/operator model.
 - **Subscription** is the top-level tenant. A sub-owner registers (Google login) and
   a new Subscription is created for them. The Subscription **owns many Groups**.
 - Roles are **per-group**, stored in the user's `groups` map: `superadmin` |
-  `admin` | `user`. The subscription owner is the highest authority for their sub.
+  `admin` | `user` | `joiner`. The subscription owner is the highest authority
+  for their sub. `joiner` is the default role granted by the invite-link join
+  flow (see Groups/Invite link below) — a holding state with no access beyond
+  the joiner's own Profile page (client-side route restriction in
+  `ProtectedRoute`, since Firestore reads stay subscription-wide regardless
+  of role — see Authorization principles) until an admin grants a real role
+  via `MembersPage`.
 - Every tenant-scoped document carries a `subscriptionId`.
 
 ## Data model (Firestore)
@@ -71,7 +77,13 @@ Catalog hierarchy: **Category → Product → Item**, plus **Kit** (checkout uni
   `groups` (map: `{ groupId: 'superadmin'|'admin'|'user' }`), `gender`,
   `sizes` (map: `{ categoryId: sizeString }` — **per-category**, since a shoe
   size and a dress size aren't the same scale)
-- `categories/{categoryId}` — `subscriptionId`, `groupId`, `name`  (e.g. dress, shoes)
+- `categories/{categoryId}` — `subscriptionId`, `groupId`, `name`, `gender`
+  (e.g. dress, shoes) — `gender` here is `'male'|'female'|'unisex'` like
+  Product/Item, and drives which categories `ProfilePage` shows a size input
+  for (a user only sees `unisex` categories plus ones matching their own
+  gender). Unlike Product/Item, a *user's own* `gender` only ever offers
+  `male`/`female` on Profile — "unisex" describes a garment that fits
+  either, not a person
 - `products/{productId}` — `subscriptionId`, `groupId`, `categoryId`, `name`,
   `gender`, `imageUrl`  (e.g. "red dress")
 - `items/{itemId}` — `subscriptionId`, `groupId`, `productId`, `size`, `gender`,
@@ -123,8 +135,9 @@ available items.
   `groupId` dropdown on its create form (populated from `GroupsPage`'s list).
 - **Invite link**: `/join/{subscriptionId}`, shown with a copy button on the
   Dashboard for admins. Visiting it (after signing in) calls the
-  `joinSubscription` Cloud Function, which adds the caller as `'user'` in
-  every group of that subscription — an admin promotes them afterward via
+  `joinSubscription` Cloud Function, which adds the caller as `'joiner'` in
+  every group of that subscription — `ProtectedRoute` confines a joiner to
+  their own Profile page until an admin grants them a real role via
   `MembersPage`/`assignRole`. Rejects if the caller already belongs to a
   subscription. Like `registerSubscription`, this must go through a Cloud
   Function: `firestore.rules` blocks `users.subscriptionId`/`groups` from

@@ -5,18 +5,27 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { SearchOutlined, CopyOutlined, LinkOutlined } from '@ant-design/icons';
-import type { Category, Item, Product } from '../types/models';
+import type { Category, Item, Product, UserProfile } from '../types/models';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 const Dashboard: React.FC = () => {
-  const { userData } = useAuth();
+  const { user, userData } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [filters, setFilters] = useState({ productId: '', categoryId: '', size: '', search: '' });
+  const [members, setMembers] = useState<UserProfile[]>([]);
+  // Defaults to showing the signed-in user's own items ("what do I have?")
+  // rather than the whole inventory; clear the Holder filter to see everyone's.
+  const [filters, setFilters] = useState({ productId: '', categoryId: '', size: '', search: '', holderId: user?.uid || '', ownerId: '' });
+
+  const memberName = (uid?: string) => {
+    if (!uid) return '';
+    if (uid === 'storage') return 'Storage';
+    return members.find(m => m.id === uid)?.name || '';
+  };
 
   const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
   const inviteLink = userData?.subscriptionId
@@ -44,16 +53,37 @@ const Dashboard: React.FC = () => {
     const qCategories = query(collection(db, 'categories'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubCategories = onSnapshot(qCategories, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category))));
 
-    return () => { unsubItems(); unsubProducts(); unsubCategories(); };
+    const qMembers = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubMembers = onSnapshot(qMembers, (snap) => setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))));
+
+    return () => { unsubItems(); unsubProducts(); unsubCategories(); unsubMembers(); };
   }, [userData]);
+
+  const productsInSelectedCategory = filters.categoryId
+    ? products.filter(p => p.categoryId === filters.categoryId)
+    : products;
+
+  const handleCategoryChange = (categoryId: string | undefined) => {
+    const newCategoryId = categoryId || '';
+    const selectedProduct = products.find(p => p.id === filters.productId);
+    const productStillValid = !newCategoryId || selectedProduct?.categoryId === newCategoryId;
+    setFilters({
+      ...filters,
+      categoryId: newCategoryId,
+      productId: productStillValid ? filters.productId : '',
+    });
+  };
 
   const filteredItems = items.filter(item => {
     const matchesProduct = !filters.productId || item.productId === filters.productId;
     const product = products.find(p => p.id === item.productId);
     const matchesCategory = !filters.categoryId || product?.categoryId === filters.categoryId;
     const matchesSize = !filters.size || item.size?.toLowerCase().includes(filters.size.toLowerCase());
-    const matchesSearch = !filters.search || product?.name?.toLowerCase().includes(filters.search.toLowerCase());
-    return matchesProduct && matchesCategory && matchesSize && matchesSearch;
+    const matchesHolder = !filters.holderId || item.holderId === filters.holderId;
+    const matchesOwner = !filters.ownerId || item.ownerId === filters.ownerId;
+    const search = filters.search.toLowerCase();
+    const matchesSearch = !search || product?.name?.toLowerCase().includes(search);
+    return matchesProduct && matchesCategory && matchesSize && matchesHolder && matchesOwner && matchesSearch;
   });
 
   return (
@@ -65,7 +95,7 @@ const Dashboard: React.FC = () => {
             <Text strong>Invite link:</Text>
             <Text code copyable={false} style={{ maxWidth: '60vw' }} ellipsis>{inviteLink}</Text>
             <Button size="small" icon={<CopyOutlined />} onClick={handleCopyInvite}>Copy</Button>
-            <Text type="secondary">New members joining via this link get the "user" role — promote them from Members.</Text>
+            <Text type="secondary">New members joining via this link get the "joiner" role (profile-only access) — grant them a real role from Members.</Text>
           </Space>
         </Card>
       )}
@@ -73,7 +103,7 @@ const Dashboard: React.FC = () => {
         <Title level={2} style={{ margin: 0 }}>Inventory Dashboard</Title>
         <Space wrap>
           <Input
-            placeholder="Search items..."
+            placeholder="Search by product..."
             prefix={<SearchOutlined />}
             onChange={e => setFilters({ ...filters, search: e.target.value })}
             style={{ width: 200 }}
@@ -81,18 +111,43 @@ const Dashboard: React.FC = () => {
           <Select
             placeholder="Category"
             allowClear
+            value={filters.categoryId || undefined}
             style={{ width: 140 }}
-            onChange={val => setFilters({ ...filters, categoryId: val })}
+            onChange={handleCategoryChange}
           >
             {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
           </Select>
           <Select
             placeholder="Product"
             allowClear
+            value={filters.productId || undefined}
             style={{ width: 140 }}
-            onChange={val => setFilters({ ...filters, productId: val })}
+            onChange={val => setFilters({ ...filters, productId: val || '' })}
           >
-            {products.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
+            {productsInSelectedCategory.map(p => <Option key={p.id} value={p.id}>{p.name}</Option>)}
+          </Select>
+          <Select
+            placeholder="Holder"
+            allowClear
+            showSearch
+            optionFilterProp="children"
+            value={filters.holderId || undefined}
+            style={{ width: 160 }}
+            onChange={val => setFilters({ ...filters, holderId: val || '' })}
+          >
+            <Option value="storage">Storage (Available)</Option>
+            {members.map(m => <Option key={m.id} value={m.id}>{m.name}</Option>)}
+          </Select>
+          <Select
+            placeholder="Owner"
+            allowClear
+            showSearch
+            optionFilterProp="children"
+            value={filters.ownerId || undefined}
+            style={{ width: 160 }}
+            onChange={val => setFilters({ ...filters, ownerId: val || '' })}
+          >
+            {members.map(m => <Option key={m.id} value={m.id}>{m.name}</Option>)}
           </Select>
         </Space>
       </div>
@@ -115,7 +170,7 @@ const Dashboard: React.FC = () => {
                         <Text strong>{item.size}</Text>
                         <Tag color={item.gender === 'male' ? 'blue' : 'magenta'}>{item.gender?.toUpperCase()}</Tag>
                       </Space>
-                      <Badge status={item.holderId === 'storage' ? 'success' : 'processing'} text={item.holderId === 'storage' ? 'In Storage' : 'With User'} />
+                      <Badge status={item.holderId === 'storage' ? 'success' : 'processing'} text={item.holderId === 'storage' ? 'In Storage' : `With ${memberName(item.holderId) || 'User'}`} />
                     </Space>
                   }
                 />

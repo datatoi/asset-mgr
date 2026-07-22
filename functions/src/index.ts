@@ -79,11 +79,14 @@ export const registerSubscription = onCall(async (request) => {
 
 /**
  * Joins the caller to an existing Subscription via its invite link
- * (/join/{subscriptionId}), as a plain 'user' in every one of that
- * subscription's groups. Firestore rules block direct client writes to
- * `users.groups`/`subscriptionId` (see firestore.rules), so this - like
- * registerSubscription - must go through the Admin SDK. Rejects if the
- * caller already belongs to a subscription or if the link is invalid.
+ * (/join/{subscriptionId}), as a 'joiner' in every one of that
+ * subscription's groups - a holding role with no access beyond their own
+ * Profile page (client-side route restriction; see ProtectedRoute) until an
+ * admin promotes them to a real role via MembersPage. Firestore rules block
+ * direct client writes to `users.groups`/`subscriptionId` (see
+ * firestore.rules), so this - like registerSubscription - must go through
+ * the Admin SDK. Rejects if the caller already belongs to a subscription or
+ * if the link is invalid.
  */
 export const joinSubscription = onCall(async (request) => {
   const {auth} = request;
@@ -123,7 +126,7 @@ export const joinSubscription = onCall(async (request) => {
 
   const groups: Record<string, string> = {};
   groupsSnap.docs.forEach((g) => {
-    groups[g.id] = "user";
+    groups[g.id] = "joiner";
   });
 
   await userRef.set({

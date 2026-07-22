@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
@@ -55,7 +55,7 @@ const CategoriesPage: React.FC = () => {
     }
   };
 
-  const onFinish = async (values: Pick<Category, 'name' | 'groupId'>) => {
+  const onFinish = async (values: Pick<Category, 'name' | 'groupId' | 'gender'>) => {
     if (!userData?.subscriptionId) return;
     try {
       if (editingCategory) {
@@ -81,6 +81,12 @@ const CategoriesPage: React.FC = () => {
       dataIndex: 'groupId',
       key: 'groupId',
       render: (id: string) => groups.find(g => g.id === id)?.name || 'Unknown'
+    },
+    {
+      title: 'Gender',
+      dataIndex: 'gender',
+      key: 'gender',
+      render: (g: string) => <Tag color={g === 'male' ? 'blue' : g === 'female' ? 'magenta' : 'default'}>{g?.toUpperCase()}</Tag>
     },
     {
       title: 'Action',
@@ -121,6 +127,13 @@ const CategoriesPage: React.FC = () => {
           <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
             <Select placeholder="Select Group">
               {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            </Select>
+          </Form.Item>
+          <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
+            <Select placeholder="Select Gender">
+              <Select.Option value="male">Male</Select.Option>
+              <Select.Option value="female">Female</Select.Option>
+              <Select.Option value="unisex">Unisex</Select.Option>
             </Select>
           </Form.Item>
         </Form>

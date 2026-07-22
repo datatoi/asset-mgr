@@ -38,13 +38,24 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
       `firestore.rules` can never let a direct client write create a group —
       `hasRole(groupId, ['superadmin'])` can't match a groupId that doesn't
       exist yet)
-- [x] Member invite flow + role assignment (per-group: superadmin/admin/user)
-      — `MembersPage` lets an admin change a member's role per group; joining
-      itself is now via **invite link** (`/join/{subscriptionId}`, shown with
-      a copy button on the Dashboard for admins → `JoinPage` → `joinSubscription`
-      Cloud Function adds the visitor as `'user'` in every group of that
-      subscription), so members no longer need to be manually added first —
-      they just need to have signed in once via the link
+- [x] Member invite flow + role assignment (per-group: superadmin/admin/user/
+      joiner) — `MembersPage` lets an admin change a member's role per group;
+      joining itself is now via **invite link** (`/join/{subscriptionId}`,
+      shown with a copy button on the Dashboard for admins → `JoinPage` →
+      `joinSubscription` Cloud Function adds the visitor as `'joiner'` in
+      every group of that subscription), so members no longer need to be
+      manually added first — they just need to have signed in once via the link
+- [x] Added a `'joiner'` role: previously new invite-link joiners got `'user'`
+      immediately, which already granted them full read access to the whole
+      app (browse catalog, request items, etc.) before an admin had actually
+      vetted them. `joiner` is a holding state with no access beyond their
+      own Profile page — enforced client-side in `ProtectedRoute` (redirects
+      any other route to `/profile`) and in `App`'s nav (only shows the
+      Profile link) — until an admin grants a real role via `MembersPage`.
+      Deliberately left as a client-side restriction, not a Firestore rules
+      change: reads have always been subscription-wide regardless of role
+      (see Authorization principles in CLAUDE.md), so this doesn't weaken
+      any existing security boundary, just the in-app navigation surface.
 - [x] Cloud Function: role assignment/revocation (superadmin-only, per group)
       — `assignRole`
 - [x] Fixed a real bug: `RegisterPage` originally wrote the Subscription/Group/
@@ -67,6 +78,16 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 - [x] Categories CRUD (e.g. dress, shoes, trousers, shirt, boots) — originally
       named "Classes"/`classes`, renamed to Categories/`categories` (dev-only,
       no backward compatibility needed)
+- [x] Added required `gender` (male/female/unisex) to Category, matching
+      Product/Item. Drives a new filter on `ProfilePage`: a user only sees a
+      size input for `unisex` categories plus ones matching their own
+      gender — previously every category showed for every user regardless of
+      fit. The user's own `gender` field on Profile was narrowed to
+      male/female only (no "unisex person"). Caveat: categories created
+      before this change have no `gender` set, so they won't match any
+      user's gender and will disappear from Profile's size list until an
+      admin edits them to set one (same class of gap as the earlier
+      `groupId` rollout — see "Data model doc/code discrepancies" below).
 - [x] Products CRUD (variant + gender + **image upload** to Cloud Storage) —
       originally named "Types"/`types`, renamed to Products/`products`
 - [x] Items CRUD (product, size, gender, condition, **image**, **rfidTag**,
@@ -105,6 +126,13 @@ See [CLAUDE.md](CLAUDE.md) for the canonical architecture and data model, and
 ## Phase 3 — Browsing & detail (web)
 - [x] Dashboard: list all items, filter by category / product / search
       (client-side filtering over the subscription's items — fine at current scale)
+- [x] Dashboard: Holder and Owner filters as dropdowns (populated from
+      subscription members, Holder also offers "Storage") instead of relying
+      on the free-text search to fuzzy-match names. Holder defaults to the
+      signed-in user on load ("what do I have?") — clear it to browse
+      everyone's items. Selecting a Category also narrows the Product
+      dropdown to that category's products, resetting the Product filter if
+      the previous selection no longer belongs to it.
 - [x] Item detail view: all properties + current holder/owner
 - [x] Detail Tab: Comments (list + add form, any user)
 - [x] Detail Tab: Holder history (chronological, shows who initiated if admin)

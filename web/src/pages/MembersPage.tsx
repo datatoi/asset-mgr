@@ -66,6 +66,7 @@ const MembersPage: React.FC = () => {
                   loading={loading}
                 >
                   <Select.Option value={null}>None</Select.Option>
+                  <Select.Option value="joiner">Joiner</Select.Option>
                   <Select.Option value="user">User</Select.Option>
                   <Select.Option value="admin">Admin</Select.Option>
                   <Select.Option value="superadmin">Superadmin</Select.Option>

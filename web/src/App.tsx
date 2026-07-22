@@ -37,9 +37,15 @@ const App: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+  const roles = Object.values(userData?.groups || {});
+  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+  // A 'joiner' (default role from the invite-link flow, before an admin
+  // grants a real role) can only reach their own Profile - see ProtectedRoute.
+  const isJoinerOnly = roles.length > 0 && roles.every(r => r === 'joiner');
 
-  const menuItems = [
+  const menuItems = isJoinerOnly ? [
+    { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
+  ] : [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/items', icon: <SkinOutlined />, label: 'Items' },
     { key: '/categories', icon: <GroupOutlined />, label: 'Categories' },

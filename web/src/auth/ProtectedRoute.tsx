@@ -20,5 +20,14 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/register" replace />;
   }
 
+  // A 'joiner' (default role from the invite-link join flow, before an
+  // admin promotes them - see joinSubscription) can only see their own
+  // Profile page, so any other route bounces them there.
+  const roles = Object.values(userData?.groups || {});
+  const isJoinerOnly = roles.length > 0 && roles.every(r => r === 'joiner');
+  if (isJoinerOnly && location.pathname !== '/profile') {
+    return <Navigate to="/profile" replace />;
+  }
+
   return <>{children}</>;
 };
