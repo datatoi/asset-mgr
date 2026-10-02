@@ -7,10 +7,10 @@ import { canManage } from '../auth/permissions';
 import { ProtectedRoute } from '../auth/ProtectedRoute';
 import MobileInventory from './MobileInventory';
 import ItemsPage from '../pages/ItemsPage';
-import ItemDetail from '../pages/ItemDetail';
+import MobileItemDetail from './MobileItemDetail';
 import KitsPage from '../pages/KitsPage';
 import MobileKits from './MobileKits';
-import ProfilePage from '../pages/ProfilePage';
+import MobileProfile from './MobileProfile';
 import MobileTransfers from './MobileTransfers';
 import CategoriesPage from '../pages/CategoriesPage';
 import ProductsPage from '../pages/ProductsPage';
@@ -62,13 +62,13 @@ export default function MobileApp() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/join/:subscriptionId" element={<JoinPage />} />
-          <Route path="/" element={<ProtectedRoute><MobileInventory /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><MobileInventory /></ProtectedRoute>} />
-          <Route path="/items" element={<ProtectedRoute><MobileInventory browse /></ProtectedRoute>} />
-          <Route path="/items/:id" element={<ProtectedRoute><ItemDetail /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><MobileInventory key="my-items" /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><MobileInventory key="my-items" /></ProtectedRoute>} />
+          <Route path="/items" element={<ProtectedRoute><MobileInventory key="inventory" browse /></ProtectedRoute>} />
+          <Route path="/items/:id" element={<ProtectedRoute><MobileItemDetail key={location.pathname} /></ProtectedRoute>} />
           <Route path="/kits" element={<ProtectedRoute><MobileKits /></ProtectedRoute>} />
           <Route path="/transfers" element={<ProtectedRoute><MobileTransfers /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
           <Route path="/manage/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
           <Route path="/manage/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />

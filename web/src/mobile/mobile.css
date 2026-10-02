@@ -31,3 +31,20 @@
 .mobile-transfer-people { display: grid; gap: 4px; overflow-wrap: anywhere; }
 .mobile-overlay input, .mobile-overlay textarea, .mobile-app input, .mobile-app textarea { font-size: 16px; }
 .mobile-overlay .ant-btn, .mobile-app .ant-btn-lg { min-height: 48px; height: auto; white-space: normal; }
+.mobile-hero { width: 100%; height: 260px; object-fit: contain; border-radius: 16px; background: #edf1f8; }
+.mobile-properties { display: grid; grid-template-columns: 85px minmax(0, 1fr); gap: 10px; margin: 0; font-size: 15px; }
+.mobile-properties dt { color: #626e82; }
+.mobile-properties dd { margin: 0; overflow-wrap: anywhere; }
+.mobile-comment { padding-top: 12px; border-top: 1px solid #edf1f8; }
+.mobile-comment-author { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.mobile-comment-author time { margin-left: auto; color: #626e82; font-size: 12px; }
+.mobile-comment p { white-space: pre-wrap; }
+.mobile-history { padding: 12px; border-left: 3px solid #91caff; background: #f7faff; border-radius: 8px; }
+.mobile-with-actions { padding-bottom: 80px; }
+.mobile-fixed-action { position: fixed; left: 12px; right: 12px; bottom: calc(82px + env(safe-area-inset-bottom)); padding: 10px; background: #fff; border-radius: 14px; box-shadow: 0 3px 18px #17243b18; z-index: 15; }
+.mobile-profile-avatar { display: flex; align-items: center; gap: 12px; }
+.mobile-profile-avatar .ant-upload-wrapper { width: 104px; flex: none; }
+.mobile-profile-avatar .ant-upload { margin: 0 !important; }
+.mobile-app .ant-collapse-header { padding-left: 0 !important; }
+.mobile-overlay .ant-select { width: 100%; }
+.mobile-overlay .ant-select-selection-item { font-size: 16px; }
