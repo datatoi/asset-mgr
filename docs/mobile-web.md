@@ -34,4 +34,4 @@ Authentication, image upload and all writes reuse the existing Firebase SDK setu
 
 Each iteration is committed and pushed to `main`. Production TypeScript/Vite builds completed, and lint completed with the pre-existing AuthContext Fast Refresh warning. The large main bundle warning remains. Automated tests and browser/device checks were not run for this work; real iPhone/Android checks are still recommended, including keyboard behavior, rotation, uploads and transfer actions.
 
-The mobile interface has not been deployed.
+The mobile web interface was deployed to [dressmanager-540ba.web.app](https://dressmanager-540ba.web.app) on 2 October 2026. The live HTML, mobile JavaScript chunk and mobile stylesheet returned HTTP 200 after release.

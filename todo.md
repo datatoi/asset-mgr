@@ -322,4 +322,4 @@ The mobile NFC project remains the separately planned Phase 6 work.
 - [x] Dedicated inventory, kit and transfer cards with mobile filters/actions.
 - [x] Dedicated item detail/profile views and compact administration access.
 - [x] Mobile administration cards, full-screen editors, safe areas and invite link.
-- [ ] Deploy the separate mobile web interface (local builds only).
+- [x] Deploy the mobile web interface to `dressmanager-540ba` on 2 October 2026.
