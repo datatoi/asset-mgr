@@ -8,7 +8,7 @@ import { saveCatalog, deleteCatalog } from '../lib/api';
 import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
-import type { Group, Item, Product } from '../types/models';
+import type { Group, Item, Product, UserProfile } from '../types/models';
 
 const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
@@ -16,6 +16,7 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [items, setItems] = useState<Item[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [members, setMembers] = useState<UserProfile[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
@@ -41,7 +42,12 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       setGroups(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group)));
     });
 
-    return () => { unsubItems(); unsubProducts(); unsubGroups(); };
+    const qMembers = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubMembers = onSnapshot(qMembers, (snapshot) => {
+      setMembers(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as UserProfile)));
+    });
+
+    return () => { unsubItems(); unsubProducts(); unsubGroups(); unsubMembers(); };
   }, [userData]);
 
   const onFinish = async (values: Pick<Item, 'productId' | 'groupId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl' | 'description'>) => {
@@ -82,7 +88,7 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
     {
       title: 'Holder',
       dataIndex: 'holderId',
-      render: (h: string) => h === 'storage' ? <Tag color="green">STORAGE</Tag> : h
+      render: (h: string) => h === 'storage' ? <Tag color="green">STORAGE</Tag> : members.find(m => m.id === h)?.name || 'Unknown member'
     },
     {
       title: 'Action',
