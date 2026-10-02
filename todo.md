@@ -314,3 +314,10 @@ agents.md document:
 Earlier entries describe historical implementation paths (including direct client
 writes). CLAUDE.md and docs/audit-fixes.md describe the replacement implementation.
 The mobile NFC project remains the separately planned Phase 6 work.
+
+## Mobile web interface — October 2026
+
+- [x] Separate mobile shell below 768px, bottom navigation and More drawer;
+      desktop presentation retained in DesktopApp.
+- [ ] Dedicated inventory, kit and transfer cards with mobile filters/actions.
+- [ ] Dedicated item detail/profile views and compact administration access.
