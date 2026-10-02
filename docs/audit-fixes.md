@@ -1,6 +1,6 @@
 # Audit fixes — 1 October 2026
 
-This records the local implementation following [the original audit](audit-2026-10-01.md). The original findings and security score describe the earlier code. These changes have **not been deployed**.
+This records the local implementation following [the original audit](audit-2026-10-01.md). The original findings and security score describe the earlier code. These changes were deployed to **`dressmanager-540ba` on 2 October 2026** from commit `00a8ca6`.
 
 ## Kit sharing
 
@@ -49,6 +49,16 @@ npx -y firebase-tools@latest emulators:exec --project demo-asset-mgr-audit --con
 ```
 
 The regression script refuses to run without emulator endpoints and the demo project ID. It invokes callable handlers against an emulated database and uses real client SDKs for rules checks. It does not validate production deployment, Google login, NFC hardware, or production composite-index readiness.
+
+## Deployment — 2 October 2026
+
+- Commit `00a8ca6` pushed to `origin/main`.
+- All 17 Node.js 24 Cloud Functions deployed in `europe-west1`.
+- Firestore and Storage rules released, and the kit lookup composite index is `READY`.
+- Hosting released at https://dressmanager-540ba.web.app; its HTML serves the current production bundle.
+- The live profile callable rejects unauthenticated requests. No production user records were changed for this check.
+
+The checks above confirm rollout status, not a full authenticated production acceptance test.
 
 ## Rollout and existing data
 

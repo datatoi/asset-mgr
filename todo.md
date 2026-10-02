@@ -308,7 +308,8 @@ agents.md document:
 - [x] Scope catalog uploads to tenant/group, enforce image type/5 MB limits, keep
       legacy images readable, and save profile avatars immediately.
 - [x] Update dependencies and add emulator regression checks.
-- [ ] Deploy the coordinated functions/rules/indexes/web update (not deployed).
+- [x] Deploy the coordinated functions/rules/indexes/web update to
+      `dressmanager-540ba` on 2 October 2026 (commit `00a8ca6`); kit index READY.
 
 Earlier entries describe historical implementation paths (including direct client
 writes). CLAUDE.md and docs/audit-fixes.md describe the replacement implementation.
