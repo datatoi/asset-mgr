@@ -23,7 +23,7 @@ export default function MobileProfile() {
   const visible = categories.rows.filter(c => c.gender === 'unisex' || c.gender === gender);
   const save = async ({ name, gender, sizes }: { name: string; gender?: Gender; sizes?: Record<string, string> }) => {
     setSaving(true);
-    try { await call('updateProfile', { name, gender, sizes }); message.success('Profile saved'); }
+    try { await call('updateProfile', { name, gender, sizes: { ...userData?.sizes, ...form.getFieldValue('sizes'), ...sizes } }); message.success('Profile saved'); }
     catch (e) { message.error(e instanceof Error ? e.message : 'Could not save profile'); }
     finally { setSaving(false); }
   };

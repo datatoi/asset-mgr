@@ -31,7 +31,7 @@ export default function MobileInventory({ browse = false }: { browse?: boolean }
   });
   const options = (entries: { id: string; name?: string }[]) => entries.map(e => ({ value: e.id, label: e.name || e.id }));
   const select = (key: keyof typeof filters, label: string, values: { value: string; label: string }[]) => <Form.Item label={label}>
-    <Select aria-label={label} allowClear showSearch optionFilterProp="label" value={filters[key] || undefined} options={values} onChange={value => setFilters(f => ({ ...f, [key]: value || '', ...(key === 'category' ? { product: '' } : {}) }))} />
+    <Select aria-label={label} allowClear showSearch optionFilterProp="label" value={filters[key] || undefined} options={values} onChange={value => { setFilters(f => ({ ...f, [key]: value || '', ...(key === 'category' ? { product: '' } : {}) })); if (key === 'holder' && value) setMode('all'); }} />
   </Form.Item>;
   return <section className="mobile-stack">
     <div className="mobile-search-row"><Input aria-label="Search inventory" placeholder="Search garments or tags" prefix={<SearchOutlined />} value={search} onChange={e => setSearch(e.target.value)} allowClear /><Button aria-label={`Filters${activeFilters ? `, ${activeFilters} active` : ''}`} icon={<FilterOutlined />} onClick={() => setOpen(true)}>{activeFilters || undefined}</Button></div>

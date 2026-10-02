@@ -178,3 +178,7 @@ ships, it will sign in with the same account you use on the web app.
 
 
 Profile pictures save immediately after upload. Use Save Changes for other profile edits. Only the subscription owner or a group superadmin can change roles; ordinary admins can edit authorized member profiles.
+
+## Phone interface
+
+Below 768px the app uses a dedicated phone layout: **My items**, **Kits**, **Transfers** and **Profile** in the bottom navigation. **More** contains inventory browsing, catalog/administration pages, invite copying and sign-out. My items offers **Available** and **All** views; use **Filters** for group, category, product, holder, owner and size. Item details include comments, holder history and request/return/offer actions. Administration uses cards and full-screen editors. Wider screens retain the desktop layout. Save pending form edits before resizing across the layout boundary. See [Mobile web interface](mobile-web.md).

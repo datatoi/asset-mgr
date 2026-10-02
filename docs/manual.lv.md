@@ -201,3 +201,7 @@ tīmekļa lietotnē.
 - Tikko pievienojāties caur ielūguma saiti un redzat tikai Profila lapu?
   Tā arī jābūt — jūs esat Pievienotājs (Joiner), kamēr administrators
   nepiešķir jums lomu.
+
+## Tālruņa saskarne
+
+Ja ekrāna platums ir mazāks par 768 pikseļiem, lietotne izmanto atsevišķu tālruņa izkārtojumu. Apakšējā navigācijā ir **My items** (Mani priekšmeti), **Kits** (Komplekti), **Transfers** (Nodošana) un **Profile** (Profils). Izvēlnē **More** (Vairāk) atrodama visu priekšmetu pārlūkošana, kataloga un administrēšanas lapas, uzaicinājuma saites kopēšana un izrakstīšanās. Priekšmetu sarakstā var izvēlēties **Available** (Pieejamie) vai **All** (Visi), bet papildu atlasi atvērt ar **Filters** (Filtri). Priekšmeta skatā ir komentāri, turētāju vēsture, pieprasīšana, atdošana glabātavā un nodošanas piedāvājumi. Administrēšanā tiek izmantotas kartītes un pilnekrāna redaktori. Platākos ekrānos saglabājas darbvirsmas izkārtojums. Pirms ekrāna platuma maiņas pāri šai robežai saglabājiet formas izmaiņas.

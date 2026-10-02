@@ -1,5 +1,6 @@
+import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
+import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { saveCatalog, deleteCatalog } from '../lib/api';
@@ -8,7 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import type { Category, Group, Product } from '../types/models';
 
-const ProductsPage: React.FC = () => {
+const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -124,9 +125,9 @@ const ProductsPage: React.FC = () => {
         <h2>Products</h2>
         <Button type="primary" hidden={!isAdmin} onClick={handleAdd}>Add Product</Button>
       </div>
-      <Table dataSource={products} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
+      <Table mobile={mobile} dataSource={products} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
-      <Modal
+      <Modal className={mobile ? "mobile-editor" : undefined}
         title={editingProduct ? "Edit Product" : "Add Product"}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}

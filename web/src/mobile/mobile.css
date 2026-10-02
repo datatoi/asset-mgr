@@ -48,3 +48,22 @@
 .mobile-app .ant-collapse-header { padding-left: 0 !important; }
 .mobile-overlay .ant-select { width: 100%; }
 .mobile-overlay .ant-select-selection-item { font-size: 16px; }
+.mobile-admin > div { padding: 0 !important; }
+.mobile-admin > div > div:first-child:not(.ant-card) { flex-wrap: wrap; gap: 12px; align-items: center; }
+.mobile-admin .ant-card .ant-card-body { padding: 12px; }
+.mobile-admin .ant-space { flex-wrap: wrap; max-width: 100%; }
+.mobile-admin .ant-space-item { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.mobile-admin .ant-btn { min-height: 48px; height: auto; white-space: normal; }
+.mobile-management-card { display: grid; gap: 12px; }
+.mobile-management-field { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.mobile-management-field > span { font-size: 12px; }
+.mobile-management-field img { object-fit: cover; border-radius: 8px; }
+.mobile-management-field .ant-select { max-width: 100%; }
+.mobile-editor.ant-modal { top: 0; margin: 0; padding: 0; width: 100% !important; max-width: 100vw; }
+.mobile-editor .ant-modal-container, .mobile-editor .ant-modal-content { min-height: 100svh; border-radius: 0; display: flex; flex-direction: column; padding-top: calc(20px + env(safe-area-inset-top)); }
+.mobile-editor .ant-modal-body { flex: 1; padding-bottom: 24px; }
+.mobile-editor .ant-modal-footer { position: sticky; bottom: 0; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: #fff; display: flex; gap: 8px; }
+.mobile-editor .ant-modal-footer .ant-btn { flex: 1; min-height: 48px; margin: 0; }
+.mobile-editor .ant-modal-close { width: 48px; height: 48px; }
+.mobile-editor input, .mobile-editor textarea, .mobile-editor .ant-select-selection-item { font-size: 16px; }
+.mobile-editor .ant-modal-title { padding-right: 40px; }

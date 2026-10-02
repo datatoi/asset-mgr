@@ -1,5 +1,6 @@
+import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
+import { Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { saveCatalog, deleteCatalog } from '../lib/api';
@@ -7,7 +8,7 @@ import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import type { Category, Group } from '../types/models';
 
-const CategoriesPage: React.FC = () => {
+const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -98,9 +99,9 @@ const CategoriesPage: React.FC = () => {
         <h2>Categories</h2>
         <Button type="primary" hidden={!isAdmin} onClick={handleAdd}>Add Category</Button>
       </div>
-      <Table dataSource={categories} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
+      <Table mobile={mobile} dataSource={categories} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
-      <Modal
+      <Modal className={mobile ? "mobile-editor" : undefined}
         title={editingCategory ? "Edit Category" : "Add Category"}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}

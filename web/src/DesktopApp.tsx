@@ -99,6 +99,8 @@ const DesktopApp: React.FC = () => {
             <Route path="/join/:subscriptionId" element={<JoinPage />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
+            <Route path="/manage/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
+            <Route path="/manage/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
             <Route path="/items/:id" element={<ProtectedRoute><ItemDetail /></ProtectedRoute>} />
             <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
             <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />

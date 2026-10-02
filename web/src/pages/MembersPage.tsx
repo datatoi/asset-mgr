@@ -1,5 +1,6 @@
+import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
-import { Table, Space, Card, Typography, message, Select, Button, Modal, Form, Input, Popconfirm } from 'antd';
+import { Space, Card, Typography, message, Select, Button, Modal, Form, Input, Popconfirm } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { call } from '../lib/api';
@@ -7,7 +8,7 @@ import { canManage, canManageRoles } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import type { Category, Group, Role, UserProfile } from '../types/models';
 
-const MembersPage: React.FC = () => {
+const MembersPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { user, userData, isOwner } = useAuth();
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -47,7 +48,7 @@ const MembersPage: React.FC = () => {
   };
   return <div style={{ padding: 24 }}><Card>
     <Typography.Title level={2}>Members</Typography.Title>
-    <Table dataSource={members} rowKey="id" scroll={{ x: 'max-content' }} columns={[
+    <Table mobile={mobile} dataSource={members} rowKey="id" scroll={{ x: 'max-content' }} columns={[
       { title: 'Name', dataIndex: 'name' }, { title: 'Email', dataIndex: 'email' },
       { title: 'Roles', render: (_: unknown, m: UserProfile) => <Space orientation="vertical">{groups.map(g => <Space key={g.id}>
         <span>{g.name}</span>
@@ -62,7 +63,7 @@ const MembersPage: React.FC = () => {
         {isOwner && m.id !== user?.uid && <Popconfirm title="Remove this member from the organization? Reassign their items first." onConfirm={() => remove(m.id)}><Button danger>Remove</Button></Popconfirm>}
       </Space> },
     ]} />
-    <Modal title="Edit member" open={!!editing} onCancel={() => setEditing(undefined)} onOk={() => form.submit()} confirmLoading={busy}>
+    <Modal className={mobile ? "mobile-editor" : undefined} title="Edit member" open={!!editing} onCancel={() => setEditing(undefined)} onOk={() => form.submit()} confirmLoading={busy}>
       <Form form={form} layout="vertical" onFinish={save}>
         <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input maxLength={200} /></Form.Item>
         <Form.Item name="gender" label="Gender"><Select options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Form.Item>

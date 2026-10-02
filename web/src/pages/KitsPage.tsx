@@ -1,5 +1,6 @@
+import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
+import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, functions } from '../lib/firebase';
 import { saveCatalog, deleteCatalog } from '../lib/api';
@@ -8,7 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import { httpsCallable } from 'firebase/functions';
 import type { Group, Kit, Product } from '../types/models';
 
-const KitsPage: React.FC = () => {
+const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
   const [kits, setKits] = useState<Kit[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -107,9 +108,9 @@ const KitsPage: React.FC = () => {
         <h2>Costume Kits (Sets)</h2>
         {isAdmin && <Button type="primary" onClick={() => { setEditingKit(null); form.resetFields(); setIsModalOpen(true); }}>Define Kit</Button>}
       </div>
-      <Table dataSource={kits} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
+      <Table mobile={mobile} dataSource={kits} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
-      <Modal title="Kit Definition" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
+      <Modal className={mobile ? "mobile-editor" : undefined} title="Kit Definition" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="name" label="Kit Name" rules={[{ required: true }]}><Input placeholder="e.g. Wedding Costume A" /></Form.Item>
           <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>

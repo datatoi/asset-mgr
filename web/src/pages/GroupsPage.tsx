@@ -1,5 +1,6 @@
+import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, message, Space, Popconfirm } from 'antd';
+import { Button, Modal, Form, Input, message, Space, Popconfirm } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { call } from '../lib/api';
@@ -7,7 +8,7 @@ import { canManageRoles } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import type { Group } from '../types/models';
 
-const GroupsPage: React.FC = () => {
+const GroupsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
   const [open, setOpen] = useState(false);
@@ -37,14 +38,14 @@ const GroupsPage: React.FC = () => {
     <Space style={{ marginBottom: 16 }}><h2>Groups</h2>
       {canManageRoles(userData, undefined, isOwner) && <Button type="primary" onClick={() => { setEditing(undefined); form.resetFields(); setOpen(true); }}>Add group</Button>}
     </Space>
-    <Table dataSource={groups} rowKey="id" columns={[
+    <Table mobile={mobile} dataSource={groups} rowKey="id" columns={[
       { title: 'Name', dataIndex: 'name' }, { title: 'Description', dataIndex: 'description' },
       { title: 'Action', render: (_: unknown, g: Group) => canManageRoles(userData, g.id, isOwner) && <Space>
         <Button onClick={() => { setEditing(g); form.setFieldsValue(g); setOpen(true); }}>Edit</Button>
         <Popconfirm title="Delete this empty group?" onConfirm={() => remove(g.id)}><Button danger>Delete</Button></Popconfirm>
       </Space> },
     ]} />
-    <Modal open={open} title={editing ? 'Edit group' : 'Add group'} onCancel={() => setOpen(false)} onOk={() => form.submit()} confirmLoading={busy}>
+    <Modal className={mobile ? "mobile-editor" : undefined} open={open} title={editing ? 'Edit group' : 'Add group'} onCancel={() => setOpen(false)} onOk={() => form.submit()} confirmLoading={busy}>
       <Form form={form} layout="vertical" onFinish={save}>
         <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input maxLength={200} /></Form.Item>
         <Form.Item name="description" label="Description"><Input.TextArea maxLength={2000} /></Form.Item>

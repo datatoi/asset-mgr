@@ -1,6 +1,7 @@
+import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
+import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { saveCatalog, deleteCatalog } from '../lib/api';
@@ -9,7 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import type { Group, Item, Product } from '../types/models';
 
-const ItemsPage: React.FC = () => {
+const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<Item[]>([]);
@@ -102,7 +103,7 @@ const ItemsPage: React.FC = () => {
         <h2>Physical Items (Inventory)</h2>
         <Button type="primary" hidden={!isAdmin} onClick={() => { setEditingItem(null); form.resetFields(); setIsModalOpen(true); }}>Add Item</Button>
       </div>
-      <Table
+      <Table mobile={mobile}
         dataSource={items}
         columns={columns}
         rowKey="id"
@@ -113,7 +114,7 @@ const ItemsPage: React.FC = () => {
         })}
       />
 
-      <Modal title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700}>
+      <Modal className={mobile ? "mobile-editor" : undefined} title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700}>
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Space align="start" size="large" wrap style={{ width: '100%' }}>
             <Form.Item name="imageUrl" label="Item Image"><ImageUpload disabled={!selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/items`} /></Form.Item>

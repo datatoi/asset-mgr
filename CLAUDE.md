@@ -27,6 +27,13 @@ hosted-SaaS billing/operator model.
    Handles subscription setup, catalog management (categories/products/items/
    kits), member management, browsing/filtering, comments, history, requests,
    and holder transfers. Hosted on Firebase Hosting.
+   - Below 768px, a separate mobile web presentation provides bottom navigation,
+     inventory/kit/transfer cards, filter drawers, item activity and profile screens.
+     Desktop presentation stays in `web/src/DesktopApp.tsx`; mobile presentation
+     lives in `web/src/mobile/`. Layout follows viewport changes.
+   - Authentication, tenant reads, permissions, uploads and callable write paths
+     remain shared. Administration forms use a mobile card renderer and full-screen
+     editors; desktop retains its tables and dialogs. See `docs/mobile-web.md`.
 
 2. **Mobile NFC scanner** (thin, single-purpose): React Native with
    `react-native-nfc-manager`. Tap a garment's NFC tag → resolve the item →

@@ -320,4 +320,6 @@ The mobile NFC project remains the separately planned Phase 6 work.
 - [x] Separate mobile shell below 768px, bottom navigation and More drawer;
       desktop presentation retained in DesktopApp.
 - [x] Dedicated inventory, kit and transfer cards with mobile filters/actions.
-- [ ] Dedicated item detail/profile views and compact administration access.
+- [x] Dedicated item detail/profile views and compact administration access.
+- [x] Mobile administration cards, full-screen editors, safe areas and invite link.
+- [ ] Deploy the separate mobile web interface (local builds only).
