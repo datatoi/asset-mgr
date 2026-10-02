@@ -5,12 +5,15 @@ import { db } from '../lib/firebase';
 import { call } from '../lib/api';
 import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
-import type { TransferRequest, UserProfile } from '../types/models';
+import { useTenantCollection } from '../hooks/useTenantCollection';
+import type { Item, Product, TransferRequest, UserProfile } from '../types/models';
 
 const TransferInbox: React.FC = () => {
   const { user, userData, isOwner } = useAuth();
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
   const [members, setMembers] = useState<UserProfile[]>([]);
+  const items = useTenantCollection<Item>('items');
+  const products = useTenantCollection<Product>('products');
   const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
 
@@ -45,7 +48,11 @@ const TransferInbox: React.FC = () => {
   };
   const columns = [
     { title: 'Requested', dataIndex: 'requestedAt', render: (d: TransferRequest['requestedAt']) => d?.toDate()?.toLocaleString() },
-    { title: 'Item', dataIndex: 'itemId', render: (id: string) => <a href={`/items/${id}`}>{id}</a> },
+    { title: 'Item', dataIndex: 'itemId', render: (id: string) => {
+      const item = items.rows.find(i => i.id === id);
+      const product = products.rows.find(p => p.id === item?.productId);
+      return <a href={`/items/${id}`}>{[product?.name || 'Unknown item', item?.size].filter(Boolean).join(' · ')}</a>;
+    } },
     { title: 'Initiated by', dataIndex: 'requestedByUserId', render: name },
     { title: 'Recipient', render: (_: unknown, r: TransferRequest) => name(r.targetUserId || r.requestedByUserId) },
     { title: 'Status', render: (_: unknown, r: TransferRequest) => <Space><Tag>{r.status}</Tag>{r.declineReason === 'holder-changed' && 'Item assigned elsewhere'}</Space> },
@@ -61,7 +68,7 @@ const TransferInbox: React.FC = () => {
   const table = (rows: TransferRequest[]) => <Table dataSource={rows} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />;
   return <div style={{ padding: 24 }}><Card>
     <Typography.Title level={2}>Transfers</Typography.Title>
-    {error && <Alert type="error" showIcon title={error} />}
+    {(error || items.error || products.error) && <Alert type="error" showIcon title={error || items.error || products.error} />}
     <Tabs items={[
       { key: 'pending', label: 'Pending', children: table(visible.filter(r => r.status === 'pending' && canApprove(r))) },
       { key: 'outgoing', label: 'My requests and offers', children: table(visible.filter(r => r.requestedByUserId === user?.uid)) },
