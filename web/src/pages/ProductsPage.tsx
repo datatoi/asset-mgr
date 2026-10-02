@@ -19,6 +19,7 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [form] = Form.useForm();
 
   const isAdmin = canManage(userData, undefined, isOwner);
+  const managedGroups = groups.filter(g => canManage(userData, g.id, isOwner));
   const selectedGroup = Form.useWatch('groupId', form);
 
   useEffect(() => {
@@ -58,6 +59,7 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const handleAdd = () => {
     setEditingProduct(null);
     form.resetFields();
+    if (managedGroups.length === 1) form.setFieldsValue({ groupId: managedGroups[0].id });
     setIsModalOpen(true);
   };
 
@@ -135,6 +137,11 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
         width={600}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
+          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+            <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ categoryId: undefined, imageUrl: undefined })} disabled={!!editingProduct?.groupId}>
+              {managedGroups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            </Select>
+          </Form.Item>
           <Form.Item name="imageUrl" label="Product Image">
             <ImageUpload disabled={!selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/products`} />
           </Form.Item>
@@ -146,7 +153,7 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
             <Input placeholder="e.g. Red Floral Skirt" />
           </Form.Item>
           <Form.Item name="categoryId" label="Category" rules={[{ required: true }]}>
-            <Select placeholder="Select Category">
+            <Select disabled={!selectedGroup} placeholder={selectedGroup ? 'Select Category' : 'Select a group first'} notFoundContent="No categories in this group. Add a category first.">
               {categories.filter(c => c.groupId === selectedGroup).map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
             </Select>
           </Form.Item>
@@ -155,11 +162,6 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
               <Select.Option value="male">Male</Select.Option>
               <Select.Option value="female">Female</Select.Option>
               <Select.Option value="unisex">Unisex</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
-            <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ categoryId: undefined, imageUrl: undefined })} disabled={!!editingProduct?.groupId}>
-              {groups.filter(g => canManage(userData, g.id, isOwner)).map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
             </Select>
           </Form.Item>
         </Form>
