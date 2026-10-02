@@ -1,0 +1,5 @@
+{
+  "score": 5,
+  "summary": "Local revised rules assessment: Firestore client mutations are denied and privileged writes use authenticated callables with authoritative tenant/group checks, field allowlists, types, reference validation and resource limits. Subscription-scoped reads follow the explicit product requirements. Storage enforces own-avatar or actual-group admin/subscription-owner authorization, image types and a 5 MB limit. 45 isolated emulator checks passed. This score assesses the reviewed rules and callable authorization boundary, not production deployment or an exhaustive penetration test; the original score is retained in the historical audit.",
+  "findings": []
+}

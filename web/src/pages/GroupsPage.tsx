@@ -1,83 +1,55 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, message } from 'antd';
+import { Table, Button, Modal, Form, Input, message, Space, Popconfirm } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { call } from '../lib/api';
+import { canManageRoles } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import type { Group } from '../types/models';
 
 const GroupsPage: React.FC = () => {
-  const { userData } = useAuth();
+  const { userData, isOwner } = useAuth();
   const [groups, setGroups] = useState<Group[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Group>();
+  const [busy, setBusy] = useState(false);
   const [form] = Form.useForm();
-
-  const isSuperAdmin = Object.values(userData?.groups || {}).some(r => r === 'superadmin');
-
   useEffect(() => {
     if (!userData?.subscriptionId) return;
-
-    const q = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
-    });
-
-    return () => unsubscribe();
-  }, [userData]);
-
-  const onFinish = async (values: Pick<Group, 'name' | 'description'>) => {
-    setCreating(true);
+    return onSnapshot(query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId)), snap => {
+      setGroups(snap.docs.map(d => ({ ...d.data(), id: d.id } as Group)));
+    }, e => message.error(e.message));
+  }, [userData?.subscriptionId]);
+  const save = async (values: { name: string; description?: string }) => {
+    setBusy(true);
     try {
-      const createGroupFn = httpsCallable(functions, 'createGroup');
-      await createGroupFn(values);
-      message.success('Group created');
-      setIsModalOpen(false);
-      form.resetFields();
-    } catch (err) {
-      message.error('Failed to create group: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setCreating(false);
-    }
+      await call(editing ? 'updateGroup' : 'createGroup', { ...values, ...(editing ? { groupId: editing.id } : {}) });
+      setOpen(false);
+      message.success('Group saved');
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Could not save group'); }
+    finally { setBusy(false); }
   };
-
-  const columns = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
-    { title: 'Description', dataIndex: 'description', key: 'description' },
-  ];
-
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-        <h2>Groups</h2>
-        {isSuperAdmin && (
-          <Button type="primary" onClick={() => setIsModalOpen(true)}>Add Group</Button>
-        )}
-      </div>
-      <Table dataSource={groups} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
-
-      <Modal
-        title="Add Group"
-        open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={creating}
-      >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item
-            name="name"
-            label="Group Name"
-            rules={[{ required: true, message: 'Please input group name' }]}
-          >
-            <Input placeholder="e.g. Seniors, Youth, Middle-aged" />
-          </Form.Item>
-          <Form.Item name="description" label="Description">
-            <Input.TextArea placeholder="Optional description" />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
-  );
+  const remove = async (groupId: string) => {
+    try { await call('deleteGroup', { groupId }); message.success('Group deleted'); }
+    catch (e) { message.error(e instanceof Error ? e.message : 'Could not delete group'); }
+  };
+  return <div style={{ padding: 24 }}>
+    <Space style={{ marginBottom: 16 }}><h2>Groups</h2>
+      {canManageRoles(userData, undefined, isOwner) && <Button type="primary" onClick={() => { setEditing(undefined); form.resetFields(); setOpen(true); }}>Add group</Button>}
+    </Space>
+    <Table dataSource={groups} rowKey="id" columns={[
+      { title: 'Name', dataIndex: 'name' }, { title: 'Description', dataIndex: 'description' },
+      { title: 'Action', render: (_: unknown, g: Group) => canManageRoles(userData, g.id, isOwner) && <Space>
+        <Button onClick={() => { setEditing(g); form.setFieldsValue(g); setOpen(true); }}>Edit</Button>
+        <Popconfirm title="Delete this empty group?" onConfirm={() => remove(g.id)}><Button danger>Delete</Button></Popconfirm>
+      </Space> },
+    ]} />
+    <Modal open={open} title={editing ? 'Edit group' : 'Add group'} onCancel={() => setOpen(false)} onOk={() => form.submit()} confirmLoading={busy}>
+      <Form form={form} layout="vertical" onFinish={save}>
+        <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input maxLength={200} /></Form.Item>
+        <Form.Item name="description" label="Description"><Input.TextArea maxLength={2000} /></Form.Item>
+      </Form>
+    </Modal>
+  </div>;
 };
-
 export default GroupsPage;

@@ -50,12 +50,14 @@ produkts, priekšmets un komplekts pieder tieši vienai grupai.
   izveidotu jaunu (nosaukums + neobligāts apraksts). Izveidojot grupu, jūs
   automātiski kļūstat par tās superadministratoru.
 - Administratori/superadministratori piesaista dalībniekus grupām (un
-  nosaka viņu lomu katrā no tām, tostarp Pievienotāja lomu) **Members
+  superadministratori vai organizācijas īpašnieks nosaka viņu lomu katrā no tām, tostarp Pievienotāja lomu) **Members
   (Dalībnieki)** lapā.
 
 ## 4. Jūsu profils
 
 Atveriet **Profile (Profils)**, lai iestatītu:
+
+- **Profila attēls** — pēc augšupielādes tas saglabājas uzreiz. Pārējās profila izmaiņas saglabājiet ar **Save Changes (Saglabāt izmaiņas)**.
 
 - **Dzimums (Gender)** — Vīrietis vai Sieviete. Izmanto, lai pieprasot
   komplektus, jums piemeklētu atbilstošus priekšmetus, kā arī lai noteiktu,
@@ -92,6 +94,8 @@ arī **Komplekti**:
 Katrai kategorijai, produktam, priekšmetam un komplektam, to izveidojot,
 jāpiešķir **grupa**.
 
+Vienu produktu un tā fiziskos priekšmetus var izmantot vairāku komplektu definīcijās. Komplekts apraksta vajadzīgos produktus un nav pastāvīgi piesaistīts konkrētiem priekšmetiem — citam komplektam nav jāveido dublēts inventārs.
+
 ## 6. Pārlūkošana un meklēšana (Dashboard)
 
 **Dashboard (Panelis)** rāda jūsu organizācijas priekšmetu sarakstu ar
@@ -123,6 +127,8 @@ noklikšķiniet uz tās, lai atvērtu detalizēto lapu.
   produktam, kas atbilst jūsu izmēram un dzimumam.
 - Savu pieprasījumu statusu un jums adresētos pieprasījumus skatiet un
   apstrādājiet sānjoslas sadaļā **Transfers (Nodošanas)**.
+
+Vairāki gaidoši pieprasījumi drīkst attiekties uz vienu priekšmetu, arī dažādu komplektu pieprasījumos. Pieprasījums to nerezervē. Pirmā apstiprinātā nodošana saņem priekšmetu; pārējie gaidošie pieprasījumi šim priekšmetam tiek automātiski noraidīti. Savu pieprasījumu statusu un atcelšanu atradīsiet Transfers (Nodošanas) → My requests and offers (Mani pieprasījumi un piedāvājumi).
 
 ## 8. Priekšmeta nodošana citam
 

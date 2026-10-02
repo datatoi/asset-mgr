@@ -84,6 +84,8 @@ The catalog is organized as **Category → Product → Item**, plus **Kits**:
 Every Category/Product/Item/Kit must be assigned to a **Group** when
 created.
 
+Products and physical garments can be shared across multiple kit definitions. A kit describes requirements and does not permanently own its items; there is no need to duplicate inventory for another kit.
+
 ## 6. Browsing and searching (Dashboard)
 
 The **Dashboard** lists items in your organization, with filters at the
@@ -112,6 +114,8 @@ click one to open its detail page.
   product matching your size and gender.
 - Track the status of your requests, and act on ones directed at you, from
   **Transfers** in the sidebar.
+
+Multiple pending requests may refer to the same garment, including requests for different kits. Requests do not reserve it. The first approved transfer gets the garment; the remaining pending requests for that garment are declined automatically. Check outgoing status and cancel requests in Transfers → My requests and offers.
 
 ## 8. Transferring an item
 
@@ -171,3 +175,6 @@ ships, it will sign in with the same account you use on the web app.
 - "Storage" as a holder means the item isn't checked out — it's available.
 - Just joined via an invite link and only see a Profile page? That's
   expected — you're a Joiner until an admin grants you a role.
+
+
+Profile pictures save immediately after upload. Use Save Changes for other profile edits. Only the subscription owner or a group superadmin can change roles; ordinary admins can edit authorized member profiles.

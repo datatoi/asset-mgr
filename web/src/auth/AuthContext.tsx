@@ -14,6 +14,7 @@ interface AuthContextType {
   user: User | null;
   userData: UserProfile | null;
   loading: boolean;
+  isOwner: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -24,23 +25,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
+    let stopProfile: (() => void) | undefined;
+    let stopSubscription: (() => void) | undefined;
+    let generation = 0;
     const unsubAuth = onAuthStateChanged(auth, (u) => {
+      const current = ++generation;
+      stopProfile?.();
+      stopSubscription?.();
+      stopProfile = undefined;
+      stopSubscription = undefined;
       setUser(u);
-      if (u) {
-        const unsubData = onSnapshot(doc(db, 'users', u.uid), (snap) => {
-          const data = snap.data();
-          setUserData(data ? { id: snap.id, ...data } as UserProfile : null);
+      setUserData(null);
+      setIsOwner(false);
+      setLoading(!!u);
+      if (!u) return;
+      let subscriptionId: string | undefined;
+      stopProfile = onSnapshot(doc(db, 'users', u.uid), (snap) => {
+        if (generation !== current) return;
+        const data = snap.data();
+        setUserData(data ? { ...data, id: snap.id } as UserProfile : null);
+        if (data?.subscriptionId && data.subscriptionId !== subscriptionId) {
+          stopSubscription?.();
+          subscriptionId = data.subscriptionId;
+          stopSubscription = onSnapshot(doc(db, 'subscriptions', data.subscriptionId), (sub) => {
+            if (generation !== current) return;
+            setIsOwner(sub.data()?.ownerUserId === u.uid);
+            setLoading(false);
+          }, () => {
+            if (generation !== current) return;
+            setIsOwner(false);
+            setLoading(false);
+          });
+        } else {
+          if (!data?.subscriptionId) {
+            stopSubscription?.();
+            subscriptionId = undefined;
+            setIsOwner(false);
+          }
           setLoading(false);
-        });
-        return () => unsubData();
-      } else {
+        }
+      }, () => {
+        if (generation !== current) return;
+        stopSubscription?.();
         setUserData(null);
+        setIsOwner(false);
         setLoading(false);
-      }
+      });
     });
-    return () => unsubAuth();
+    return () => {
+      generation++;
+      stopProfile?.();
+      stopSubscription?.();
+      unsubAuth();
+    };
   }, []);
 
   const login = async () => {
@@ -53,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, userData, loading, isOwner, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

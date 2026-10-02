@@ -1,92 +1,74 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Space, Card, Typography, message, Select } from 'antd';
+import { Table, Space, Card, Typography, message, Select, Button, Modal, Form, Input, Popconfirm } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { call } from '../lib/api';
+import { canManage, canManageRoles } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
-import type { Group, Role, UserProfile } from '../types/models';
-
-const { Title } = Typography;
+import type { Category, Group, Role, UserProfile } from '../types/models';
 
 const MembersPage: React.FC = () => {
-  const { userData } = useAuth();
+  const { user, userData, isOwner } = useAuth();
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(false);
-
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<{ member: UserProfile; groupId: string }>();
+  const [form] = Form.useForm();
   useEffect(() => {
     if (!userData?.subscriptionId) return;
-
-    // Fetch all users in this subscription
-    const qUsers = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubUsers = onSnapshot(qUsers, (snap) => {
-      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
-    });
-
-    // Fetch all groups in this subscription
-    const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubGroups = onSnapshot(qGroups, (snap) => {
-      setGroups(snap.docs.map(d => ({ id: d.id, ...d.data() } as Group)));
-    });
-
-    return () => { unsubUsers(); unsubGroups(); };
-  }, [userData]);
-
-  const handleRoleChange = async (targetUid: string, groupId: string, role: Role | null) => {
-    setLoading(true);
-    try {
-      const assignRoleFn = httpsCallable(functions, 'assignRole');
-      await assignRoleFn({ targetUid, groupId, role });
-      message.success('Role updated successfully');
-    } catch (err) {
-      message.error('Failed to update role: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setLoading(false);
-    }
+    const sub = userData.subscriptionId;
+    const error = (e: Error) => { message.error(e.message); };
+    const a = onSnapshot(query(collection(db, 'users'), where('subscriptionId', '==', sub)), snap => setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile))), error);
+    const b = onSnapshot(query(collection(db, 'groups'), where('subscriptionId', '==', sub)), snap => setGroups(snap.docs.map(d => ({ ...d.data(), id: d.id } as Group))), error);
+    const c = onSnapshot(query(collection(db, 'categories'), where('subscriptionId', '==', sub)), snap => setCategories(snap.docs.map(d => ({ ...d.data(), id: d.id } as Category))), error);
+    return () => { a(); b(); c(); };
+  }, [userData?.subscriptionId]);
+  const changeRole = async (targetUid: string, groupId: string, role: Role | null) => {
+    setBusy(true);
+    try { await call('assignRole', { targetUid, groupId, role }); message.success('Role updated'); }
+    catch (e) { message.error(e instanceof Error ? e.message : 'Could not update role'); }
+    finally { setBusy(false); }
   };
-
-  const columns = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
-    { title: 'Email', dataIndex: 'email', key: 'email' },
-    {
-      title: 'Roles',
-      key: 'roles',
-      render: (_: unknown, record: UserProfile) => (
-        <Space direction="vertical" style={{ width: '100%' }}>
-          {groups.map(group => {
-            const currentRole = record.groups?.[group.id];
-            return (
-              <div key={group.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>{group.name}:</span>
-                <Select
-                  value={currentRole || null}
-                  placeholder="No Role"
-                  style={{ width: 120 }}
-                  onChange={(val) => handleRoleChange(record.id, group.id, val)}
-                  loading={loading}
-                >
-                  <Select.Option value={null}>None</Select.Option>
-                  <Select.Option value="joiner">Joiner</Select.Option>
-                  <Select.Option value="user">User</Select.Option>
-                  <Select.Option value="admin">Admin</Select.Option>
-                  <Select.Option value="superadmin">Superadmin</Select.Option>
-                </Select>
-              </div>
-            );
-          })}
-        </Space>
-      )
-    }
-  ];
-
-  return (
-    <div style={{ padding: 24 }}>
-      <Card>
-        <Title level={2}>Member Management</Title>
-        <Table dataSource={members} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
-      </Card>
-    </div>
-  );
+  const editGroup = (m: UserProfile) => groups.find(g => m.groups?.[g.id] && canManage(userData, g.id, isOwner) &&
+    (isOwner || m.id === user?.uid || (m.groups?.[g.id] !== 'superadmin' && (userData?.groups?.[g.id] === 'superadmin' || m.groups?.[g.id] !== 'admin'))));
+  const save = async (values: { name?: string; gender?: string; sizes?: Record<string, string> }) => {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await call('updateMember', { targetUid: editing.member.id, groupId: editing.groupId, profile: values });
+      setEditing(undefined); message.success('Member saved');
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Could not save member'); }
+    finally { setBusy(false); }
+  };
+  const remove = async (targetUid: string) => {
+    try { await call('removeMember', { targetUid }); message.success('Member removed'); }
+    catch (e) { message.error(e instanceof Error ? e.message : 'Could not remove member'); }
+  };
+  return <div style={{ padding: 24 }}><Card>
+    <Typography.Title level={2}>Members</Typography.Title>
+    <Table dataSource={members} rowKey="id" scroll={{ x: 'max-content' }} columns={[
+      { title: 'Name', dataIndex: 'name' }, { title: 'Email', dataIndex: 'email' },
+      { title: 'Roles', render: (_: unknown, m: UserProfile) => <Space orientation="vertical">{groups.map(g => <Space key={g.id}>
+        <span>{g.name}</span>
+        <Select style={{ width: 150 }} value={m.groups?.[g.id] || ''} loading={busy}
+          disabled={!canManageRoles(userData, g.id, isOwner)}
+          onChange={val => changeRole(m.id, g.id, (val || null) as Role | null)} options={[
+            { value: '', label: 'No role' }, ...['joiner', 'user', 'admin', 'superadmin'].map(role => ({ value: role, label: role })),
+          ]} />
+      </Space>)}</Space> },
+      { title: 'Action', render: (_: unknown, m: UserProfile) => <Space>
+        {editGroup(m) && <Button onClick={() => { const g = editGroup(m); if (g) { setEditing({ member: m, groupId: g.id }); form.resetFields(); form.setFieldsValue(m); } }}>Edit profile</Button>}
+        {isOwner && m.id !== user?.uid && <Popconfirm title="Remove this member from the organization? Reassign their items first." onConfirm={() => remove(m.id)}><Button danger>Remove</Button></Popconfirm>}
+      </Space> },
+    ]} />
+    <Modal title="Edit member" open={!!editing} onCancel={() => setEditing(undefined)} onOk={() => form.submit()} confirmLoading={busy}>
+      <Form form={form} layout="vertical" onFinish={save}>
+        <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input maxLength={200} /></Form.Item>
+        <Form.Item name="gender" label="Gender"><Select options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Form.Item>
+        {categories.map(c => <Form.Item key={c.id} name={['sizes', c.id]} label={`${c.name} size`}><Input maxLength={50} /></Form.Item>)}
+      </Form>
+    </Modal>
+  </Card></div>;
 };
-
 export default MembersPage;

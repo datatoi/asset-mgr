@@ -1,35 +1,36 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function getUserData() {
-      // Note: storage rules can't easily fetch from firestore across projects without specific setup,
-      // but in Firebase v9+ they can if it's the same project.
+    function signedIn() { return request.auth != null; }
+    function user() {
       return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
     }
-
-    function isAnyAdmin() {
-      let userData = getUserData();
-      return userData.groups.values().hasAny(['admin', 'superadmin']);
+    function inSubscription(subId) {
+      return signedIn() && user().subscriptionId == subId;
     }
-
-    match /avatars/{userId}/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
+    function groupAdmin(subId, groupId) {
+      let group = firestore.get(/databases/(default)/documents/groups/$(groupId)).data;
+      return inSubscription(subId) && group.subscriptionId == subId &&
+        (group.get('subscriptionOwnerId', '') == request.auth.uid ||
+        user().groups.get(groupId, 'none') in ['admin', 'superadmin']);
     }
-
-    match /products/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isAnyAdmin();
+    function validImage() {
+      return request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
     }
-
-    match /items/{allPaths=**} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isAnyAdmin();
+    match /avatars/{uid}/{imageId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid && validImage();
+      allow delete: if signedIn() && request.auth.uid == uid;
     }
+    match /subscriptions/{subId}/groups/{groupId}/{kind}/{imageId} {
+      allow read: if inSubscription(subId) && kind in ['items', 'products'];
+      allow create, update: if kind in ['items', 'products'] &&
+        groupAdmin(subId, groupId) && validImage();
+      allow delete: if kind in ['items', 'products'] && groupAdmin(subId, groupId);
+    }
+    // Existing authenticated image URLs keep working. Legacy paths are read-only.
+    match /products/{imageId} { allow read: if signedIn(); allow write: if false; }
+    match /items/{imageId} { allow read: if signedIn(); allow write: if false; }
   }
 }

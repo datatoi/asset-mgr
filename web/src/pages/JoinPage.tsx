@@ -56,7 +56,7 @@ const JoinPage: React.FC = () => {
                 Sign in with Google
               </Button>
             </Space>
-          ) : userData ? (
+          ) : userData?.subscriptionId ? (
             <Result
               status="warning"
               title="You already belong to an organization"

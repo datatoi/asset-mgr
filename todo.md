@@ -291,3 +291,25 @@ agents.md document:
 - [x] ~~Should `MembersPage` support inviting a user by email who hasn't
       signed in yet~~ — **resolved**: invite link (`/join/{subscriptionId}`)
       lets anyone sign in and join directly, no pre-existing account needed.
+
+
+## October 2026 audit remediation
+
+- [x] Preserve shared products/items across kit definitions; allow competing pending
+      requests and enforce first-valid-approval semantics without reservations.
+- [x] Route all document writes through validated callables; enforce tenant/group
+      boundaries, immutable scope, bounded schemas, and catalog references.
+- [x] Transactional onboarding, transfer approval, and roles; protect last superadmin
+      and retain subscription-owner authority.
+- [x] Fix regular-user transfer inbox, outgoing status/cancellation, unisex kit
+      fulfillment, spoofed comments, and auth listener cleanup.
+- [x] Add group edit/delete, member profile edit/removal, dashboard group filter,
+      item product/category/gender/history actor, and sign-out control.
+- [x] Scope catalog uploads to tenant/group, enforce image type/5 MB limits, keep
+      legacy images readable, and save profile avatars immediately.
+- [x] Update dependencies and add emulator regression checks.
+- [ ] Deploy the coordinated functions/rules/indexes/web update (not deployed).
+
+Earlier entries describe historical implementation paths (including direct client
+writes). CLAUDE.md and docs/audit-fixes.md describe the replacement implementation.
+The mobile NFC project remains the separately planned Phase 6 work.

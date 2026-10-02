@@ -1,57 +1,58 @@
 import React, { useState } from 'react';
-import { Upload, message } from 'antd';
+import { Upload, message, type UploadProps } from 'antd';
 import { LoadingOutlined, PlusOutlined } from '@ant-design/icons';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../lib/firebase';
+import { call } from '../lib/api';
 
 interface ImageUploadProps {
   value?: string;
-  onChange?: (url: string) => void;
+  onChange?: (url: string) => void | Promise<void>;
   folder: string;
+  disabled?: boolean;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, folder }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({ value, onChange, folder, disabled }) => {
   const [loading, setLoading] = useState(false);
-
-  const handleChange = async (info: any) => {
-    if (info.file.status === 'uploading') {
-      setLoading(true);
-      return;
-    }
-    
+  const upload: UploadProps['customRequest'] = async ({ file, onSuccess, onError }) => {
+    setLoading(true);
     try {
-      const file = info.file.originFileObj;
-      const storageRef = ref(storage, `${folder}/${Date.now()}_${file.name}`);
+      if (typeof file === 'string') throw new Error('Select an image file.');
+      const groupPath = /^subscriptions\/[^/]+\/groups\/([^/]+)\/(items|products)$/.exec(folder);
+      const uploadFolder = groupPath ? (await call<{ folder: string }>('prepareImageUpload', { groupId: groupPath[1], kind: groupPath[2] })).folder : folder;
+      const storageRef = ref(storage, `${uploadFolder}/${crypto.randomUUID()}`);
       const snapshot = await uploadBytes(storageRef, file);
       const url = await getDownloadURL(snapshot.ref);
-      
-      setLoading(false);
-      if (onChange) onChange(url);
-      message.success('Image uploaded successfully');
+      await onChange?.(url);
+      onSuccess?.(url);
+      message.success('Image saved');
     } catch (error) {
+      const failure = error instanceof Error ? error : new Error(String(error));
+      onError?.(failure);
+      message.error(failure.message);
+    } finally {
       setLoading(false);
-      message.error('Upload failed: ' + (error instanceof Error ? error.message : String(error)));
-      console.error(error);
     }
   };
 
-  const uploadButton = (
-    <div>
-      {loading ? <LoadingOutlined /> : <PlusOutlined />}
-      <div style={{ marginTop: 8 }}>Upload</div>
-    </div>
-  );
-
   return (
     <Upload
-      name="avatar"
       listType="picture-card"
-      className="avatar-uploader"
       showUploadList={false}
-      customRequest={({ onSuccess }: any) => setTimeout(() => onSuccess("ok"), 0)}
-      onChange={handleChange}
+      disabled={disabled || loading}
+      accept="image/jpeg,image/png,image/webp,image/gif"
+      beforeUpload={file => {
+        if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+          message.error('Choose a JPG, PNG, WebP or GIF image up to 5 MB.');
+          return Upload.LIST_IGNORE;
+        }
+        return true;
+      }}
+      customRequest={upload}
     >
-      {value ? <img src={value} alt="avatar" style={{ width: '100%' }} /> : uploadButton}
+      {loading ? <LoadingOutlined /> : value ? <img src={value} alt="Uploaded image" style={{ width: '100%' }} /> : (
+        <div><PlusOutlined /><div style={{ marginTop: 8 }}>{disabled ? 'Select group first' : 'Upload'}</div></div>
+      )}
     </Upload>
   );
 };

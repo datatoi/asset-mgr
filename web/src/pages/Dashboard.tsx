@@ -5,21 +5,22 @@ import { db } from '../lib/firebase';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { SearchOutlined, CopyOutlined, LinkOutlined } from '@ant-design/icons';
-import type { Category, Item, Product, UserProfile } from '../types/models';
+import type { Category, Group, Item, Product, UserProfile } from '../types/models';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 const Dashboard: React.FC = () => {
-  const { user, userData } = useAuth();
+  const { user, userData, isOwner } = useAuth();
   const navigate = useNavigate();
+  const [groups, setGroups] = useState<Group[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [members, setMembers] = useState<UserProfile[]>([]);
   // Defaults to showing the signed-in user's own items ("what do I have?")
   // rather than the whole inventory; clear the Holder filter to see everyone's.
-  const [filters, setFilters] = useState({ productId: '', categoryId: '', size: '', search: '', holderId: user?.uid || '', ownerId: '' });
+  const [filters, setFilters] = useState({ groupId: '', productId: '', categoryId: '', size: '', search: '', holderId: user?.uid || '', ownerId: '' });
 
   const memberName = (uid?: string) => {
     if (!uid) return '';
@@ -27,7 +28,7 @@ const Dashboard: React.FC = () => {
     return members.find(m => m.id === uid)?.name || '';
   };
 
-  const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+  const isAdmin = isOwner || Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
   const inviteLink = userData?.subscriptionId
     ? `${window.location.origin}/join/${userData.subscriptionId}`
     : '';
@@ -45,18 +46,19 @@ const Dashboard: React.FC = () => {
     if (!userData?.subscriptionId) return;
 
     const qItems = query(collection(db, 'items'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubItems = onSnapshot(qItems, (snap) => setItems(snap.docs.map(d => ({ id: d.id, ...d.data() } as Item))));
+    const unsubItems = onSnapshot(qItems, (snap) => setItems(snap.docs.map(d => ({ ...d.data(), id: d.id } as Item))));
 
     const qProducts = query(collection(db, 'products'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubProducts = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ id: d.id, ...d.data() } as Product))));
+    const unsubProducts = onSnapshot(qProducts, (snap) => setProducts(snap.docs.map(d => ({ ...d.data(), id: d.id } as Product))));
 
     const qCategories = query(collection(db, 'categories'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubCategories = onSnapshot(qCategories, (snap) => setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category))));
+    const unsubCategories = onSnapshot(qCategories, (snap) => setCategories(snap.docs.map(d => ({ ...d.data(), id: d.id } as Category))));
 
     const qMembers = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
-    const unsubMembers = onSnapshot(qMembers, (snap) => setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile))));
+    const unsubMembers = onSnapshot(qMembers, (snap) => setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile))));
 
-    return () => { unsubItems(); unsubProducts(); unsubCategories(); unsubMembers(); };
+    const unsubGroups = onSnapshot(query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId)), snap => setGroups(snap.docs.map(d => ({ ...d.data(), id: d.id } as Group))));
+    return () => { unsubGroups(); unsubItems(); unsubProducts(); unsubCategories(); unsubMembers(); };
   }, [userData]);
 
   const productsInSelectedCategory = filters.categoryId
@@ -83,7 +85,7 @@ const Dashboard: React.FC = () => {
     const matchesOwner = !filters.ownerId || item.ownerId === filters.ownerId;
     const search = filters.search.toLowerCase();
     const matchesSearch = !search || product?.name?.toLowerCase().includes(search);
-    return matchesProduct && matchesCategory && matchesSize && matchesHolder && matchesOwner && matchesSearch;
+    return (!filters.groupId || item.groupId === filters.groupId) && matchesProduct && matchesCategory && matchesSize && matchesHolder && matchesOwner && matchesSearch;
   });
 
   return (
@@ -102,6 +104,9 @@ const Dashboard: React.FC = () => {
       <div style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 16, justifyContent: 'space-between', alignItems: 'center' }}>
         <Title level={2} style={{ margin: 0 }}>Inventory Dashboard</Title>
         <Space wrap>
+          <Select placeholder="Group" allowClear style={{ width: 160 }} value={filters.groupId || undefined} onChange={val => setFilters({ ...filters, groupId: val || '' })}>
+            {groups.map(g => <Option key={g.id} value={g.id}>{g.name}</Option>)}
+          </Select>
           <Input
             placeholder="Search by product..."
             prefix={<SearchOutlined />}

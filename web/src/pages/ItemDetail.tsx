@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { doc, onSnapshot, collection, query, orderBy, addDoc, serverTimestamp, updateDoc, where } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebase';
+import { doc, onSnapshot, collection, query, orderBy, where } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { call, saveCatalog } from '../lib/api';
+import { canManage } from '../auth/permissions';
 import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select, Space } from 'antd';
 import { useAuth } from '../auth/AuthContext';
-import type { HolderHistoryEntry, Item, ItemComment, UserProfile } from '../types/models';
+import type { Category, Product, HolderHistoryEntry, Item, ItemComment, UserProfile } from '../types/models';
 
 const { Title, Text } = Typography;
 
 const ItemDetail: React.FC = () => {
   const { id } = useParams();
-  const { user, userData } = useAuth();
+  const { user, userData, isOwner } = useAuth();
   const [item, setItem] = useState<Item | null>(null);
   const [comments, setComments] = useState<ItemComment[]>([]);
   const [history, setHistory] = useState<HolderHistoryEntry[]>([]);
@@ -22,59 +23,64 @@ const ItemDetail: React.FC = () => {
   const [transferTarget, setTransferTarget] = useState<string | undefined>();
   const [sendingTransfer, setSendingTransfer] = useState(false);
 
-  const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+  const isAdmin = !!item && canManage(userData, item.groupId, isOwner);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [category, setCategory] = useState<Category | null>(null);
+  const [loadError, setLoadError] = useState<string>();
   const isHolderOrOwner = item?.holderId === user?.uid || item?.ownerId === user?.uid;
 
   useEffect(() => {
     if (!id) return;
-    const unsubItem = onSnapshot(doc(db, 'items', id), (snap) => setItem({ id: snap.id, ...snap.data() } as Item));
+    setLoadError(undefined); setItem(null); setComments([]); setHistory([]);
+    const unsubItem = onSnapshot(doc(db, 'items', id), (snap) => { setItem(snap.exists() ? { ...snap.data(), id: snap.id } as Item : null); if (!snap.exists()) setLoadError('Item not found'); }, e => setLoadError(e.message));
 
     const qComments = query(collection(db, 'items', id, 'comments'), orderBy('timestamp', 'desc'));
-    const unsubComments = onSnapshot(qComments, (snap) => setComments(snap.docs.map(d => ({ id: d.id, ...d.data() } as ItemComment))));
+    const unsubComments = onSnapshot(qComments, (snap) => setComments(snap.docs.map(d => ({ ...d.data(), id: d.id } as ItemComment))));
 
     const qHistory = query(collection(db, 'items', id, 'holderHistory'), orderBy('transferDate', 'desc'));
-    const unsubHistory = onSnapshot(qHistory, (snap) => setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() } as HolderHistoryEntry))));
+    const unsubHistory = onSnapshot(qHistory, (snap) => setHistory(snap.docs.map(d => ({ ...d.data(), id: d.id } as HolderHistoryEntry))));
 
     return () => { unsubItem(); unsubComments(); unsubHistory(); };
   }, [id]);
 
   useEffect(() => {
-    if ((!isAdmin && !isHolderOrOwner) || !userData?.subscriptionId) return;
+    if (!userData?.subscriptionId) return;
     const q = query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubscribe = onSnapshot(q, (snap) => {
-      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
+      setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile)));
     });
     return () => unsubscribe();
-  }, [isAdmin, isHolderOrOwner, userData?.subscriptionId]);
+  }, [userData?.subscriptionId]);
+
+  useEffect(() => {
+    setProduct(null); setCategory(null);
+    if (!item?.productId) return;
+    let stopCategory: (() => void) | undefined;
+    const stopProduct = onSnapshot(doc(db, 'products', item.productId), snap => {
+      setProduct(snap.exists() ? { ...snap.data(), id: snap.id } as Product : null);
+      stopCategory?.();
+      const categoryId = snap.data()?.categoryId;
+      if (categoryId) stopCategory = onSnapshot(doc(db, 'categories', categoryId), c => setCategory(c.exists() ? { ...c.data(), id: c.id } as Category : null));
+    }, e => setLoadError(e.message));
+    return () => { stopProduct(); stopCategory?.(); };
+  }, [item?.productId]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !id || !user) return;
-    await addDoc(collection(db, 'items', id, 'comments'), {
-      userId: user.uid,
-      userName: user.displayName,
-      avatarUrl: user.photoURL,
-      text: newComment,
-      timestamp: serverTimestamp(),
-    });
-    setNewComment('');
+    try {
+      await call('addComment', { itemId: id, text: newComment });
+      setNewComment('');
+    } catch (e) { message.error(e instanceof Error ? e.message : 'Could not post comment'); }
   };
 
   const handleRequest = async () => {
     if (!id || !user || !userData || !item) return;
     setRequesting(true);
     try {
-      await addDoc(collection(db, 'transfers'), {
-        subscriptionId: userData.subscriptionId,
-        groupId: item.groupId,
-        itemId: id,
-        requestedByUserId: user.uid,
-        currentHolderId: item.holderId,
-        status: 'pending',
-        requestedAt: serverTimestamp(),
-      });
+      await call('createTransfer', { itemId: id });
       message.success('Request sent successfully');
     } catch (err) {
-      message.error('Failed to send request');
+      message.error(err instanceof Error ? err.message : 'Failed to send request');
     } finally {
       setRequesting(false);
     }
@@ -84,16 +90,7 @@ const ItemDetail: React.FC = () => {
     if (!id || !user || !userData || !item || !transferTarget) return;
     setSendingTransfer(true);
     try {
-      await addDoc(collection(db, 'transfers'), {
-        subscriptionId: userData.subscriptionId,
-        groupId: item.groupId,
-        itemId: id,
-        requestedByUserId: user.uid,
-        currentHolderId: item.holderId,
-        targetUserId: transferTarget,
-        status: 'pending',
-        requestedAt: serverTimestamp(),
-      });
+      await call('createTransfer', { itemId: id, targetUserId: transferTarget });
       message.success('Transfer offer sent - awaiting their acceptance');
       setTransferTarget(undefined);
     } catch (err) {
@@ -107,8 +104,7 @@ const ItemDetail: React.FC = () => {
     if (!id) return;
     setChangingHolder(true);
     try {
-      const transferItemFn = httpsCallable(functions, 'transferItem');
-      await transferItemFn({ itemId: id, newHolderId, transferType: 'admin' });
+      await call('transferItem', { itemId: id, newHolderId });
       message.success('Holder updated');
     } catch (err) {
       message.error('Failed to update holder: ' + (err instanceof Error ? err.message : String(err)));
@@ -120,21 +116,23 @@ const ItemDetail: React.FC = () => {
   const handleChangeOwner = async (newOwnerId: string | null) => {
     if (!id) return;
     try {
-      await updateDoc(doc(db, 'items', id), { ownerId: newOwnerId });
+      await saveCatalog('items', { ownerId: newOwnerId }, id);
       message.success('Owner updated');
     } catch (err) {
       message.error('Failed to update owner: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
-  if (!item) return null;
+  if (loadError) return <Card>{loadError}</Card>;
+  if (!item) return <Card>Loading item…</Card>;
 
-  const memberName = (uid?: string) => uid ? (members.find(m => m.id === uid)?.name || uid) : 'Unassigned';
+  const memberName = (uid?: string | null) => uid ? (members.find(m => m.id === uid)?.name || uid) : 'Unassigned';
 
   const historyColumns = [
     { title: 'Date', dataIndex: 'transferDate', render: (d: HolderHistoryEntry['transferDate']) => d?.toDate().toLocaleString() },
     { title: 'From', dataIndex: 'previousHolderId', render: (uid: string) => uid === 'storage' ? 'Storage' : memberName(uid) },
     { title: 'To', dataIndex: 'newHolderId', render: (uid: string) => uid === 'storage' ? 'Storage' : memberName(uid) },
+    { title: 'Initiated by', dataIndex: 'initiatedByUserId', render: memberName },
     { title: 'Type', dataIndex: 'transferType', render: (t: string) => <Tag>{t.toUpperCase()}</Tag> }
   ];
 
@@ -143,12 +141,12 @@ const ItemDetail: React.FC = () => {
       <Card>
         <Row gutter={24}>
           <Col md={8}>
-            <img src={item.imageUrl} alt="item" style={{ width: '100%', borderRadius: 8 }} />
+            <img src={item.imageUrl || product?.imageUrl} alt="item" style={{ width: '100%', borderRadius: 8 }} />
           </Col>
           <Col md={16}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
               <Title level={2} style={{ margin: 0 }}>Item Details</Title>
-              {!isAdmin && item.holderId !== user?.uid && (
+              {item.holderId !== user?.uid && (
                 <Button
                   type="primary"
                   size="large"
@@ -159,7 +157,8 @@ const ItemDetail: React.FC = () => {
                   {item.holderId === 'storage' ? 'Request from Storage' : 'Request Transfer'}
                 </Button>
               )}
-              {!isAdmin && isHolderOrOwner && (
+              {item.holderId === user?.uid && <Button onClick={() => handleChangeHolder('storage')} loading={changingHolder}>Return to storage</Button>}
+              {isHolderOrOwner && (
                 <Space wrap>
                   <Select
                     placeholder="Transfer to..."
@@ -185,6 +184,9 @@ const ItemDetail: React.FC = () => {
               )}
             </div>
             <Descriptions bordered column={1}>
+              <Descriptions.Item label="Product">{product?.name || 'Unknown'}</Descriptions.Item>
+              <Descriptions.Item label="Category">{category?.name || 'Unknown'}</Descriptions.Item>
+              <Descriptions.Item label="Gender">{item.gender}</Descriptions.Item>
               <Descriptions.Item label="RFID Tag">{item.rfidTag || 'None'}</Descriptions.Item>
               <Descriptions.Item label="Size">{item.size}</Descriptions.Item>
               <Descriptions.Item label="Condition"><Tag color="orange">{item.condition?.toUpperCase()}</Tag></Descriptions.Item>
@@ -233,6 +235,7 @@ const ItemDetail: React.FC = () => {
                       <div style={{ marginBottom: 16 }}>
                         <Input.TextArea
                           rows={3}
+                          maxLength={2000}
                           value={newComment}
                           onChange={e => setNewComment(e.target.value)}
                           placeholder="Add a comment about this item..."

@@ -1,117 +1,60 @@
 rules_version = '2';
+// Data model: subscriptions own groups and all tenant documents. users contain
+// subscriptionId/groups (server-managed), and a bounded editable profile.
+// Catalog parents, comments, history and transfer states are validated by
+// callable functions. No client document writes are accepted, including create.
+// Subscription-wide member/catalog reads are intentional (see CLAUDE.md).
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helpers
-    function isAuthenticated() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function inSubscription(data) {
+      let user = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return signedIn() && data.subscriptionId is string &&
+        user.subscriptionId == data.subscriptionId;
     }
-
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function belongsToSub(resourceData) {
-      return resourceData.subscriptionId == getUserData().subscriptionId;
-    }
-
-    function hasRole(groupId, roles) {
-      let userGroups = getUserData().groups;
-      return userGroups.get(groupId, 'none') in roles;
-    }
-
-    function isAnyAdmin() {
-      let userGroups = getUserData().groups;
-      return userGroups.values().hasAny(['admin', 'superadmin']);
-    }
-
-    // Collections
-
-    match /users/{userId} {
-      allow read: if isAuthenticated() &&
-        (request.auth.uid == userId || belongsToSub(resource.data));
-      // Clients can update their own profile EXCEPT roles (groups map)
-      allow update: if isAuthenticated() && request.auth.uid == userId
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['groups', 'subscriptionId']);
-      // Clients may self-create their own profile doc, but never with
-      // subscriptionId/groups set directly - that would let anyone grant
-      // themselves a role in any group just by knowing its ID. Joining a
-      // subscription (registration or invite link) always goes through a
-      // Cloud Function (Admin SDK, bypasses these rules).
-      allow create: if isAuthenticated() && request.auth.uid == userId
-                    && !('subscriptionId' in request.resource.data)
-                    && !('groups' in request.resource.data);
-    }
-
-    match /subscriptions/{subId} {
-      allow read: if isAuthenticated() &&
-        (resource.data.ownerUserId == request.auth.uid || getUserData().subscriptionId == subId);
-      // Created via the registerSubscription Cloud Function (Admin SDK,
-      // bypasses rules) - no direct client writes.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || inSubscription(resource.data));
       allow write: if false;
     }
-
-    match /groups/{groupId} {
-      allow read: if isAuthenticated() && belongsToSub(resource.data);
-      allow write: if isAuthenticated() && hasRole(groupId, ['superadmin']);
+    match /subscriptions/{subId} {
+      allow read: if signedIn() &&
+        (resource.data.ownerUserId == request.auth.uid ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.subscriptionId == subId);
+      allow write: if false;
     }
-
+    match /groups/{id} {
+      allow read: if signedIn() && inSubscription(resource.data);
+      allow write: if false;
+    }
     match /categories/{id} {
-      allow read: if isAuthenticated() && belongsToSub(resource.data);
-      allow write: if isAuthenticated() && isAnyAdmin();
+      allow read: if signedIn() && inSubscription(resource.data);
+      allow write: if false;
     }
-
     match /products/{id} {
-      allow read: if isAuthenticated() && belongsToSub(resource.data);
-      allow write: if isAuthenticated() && isAnyAdmin();
+      allow read: if signedIn() && inSubscription(resource.data);
+      allow write: if false;
     }
-
+    match /kits/{id} {
+      allow read: if signedIn() && inSubscription(resource.data);
+      allow write: if false;
+    }
     match /items/{itemId} {
-      allow read: if isAuthenticated() && belongsToSub(resource.data);
-      // Admins may create/delete items freely. Updates may not touch holderId
-      // (privileged, Cloud-Function-only field) - note resource.data doesn't
-      // exist yet on create, so that check must live in a separate update rule.
-      allow create: if isAuthenticated() && isAnyAdmin();
-      allow update: if isAuthenticated() && isAnyAdmin()
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['holderId', 'subscriptionId']);
-      allow delete: if isAuthenticated() && isAnyAdmin();
-
-      match /comments/{commentId} {
-        allow read: if isAuthenticated() &&
-          belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data);
-        allow create: if isAuthenticated();
+      allow read: if signedIn() && inSubscription(resource.data);
+      allow write: if false;
+      match /comments/{id} {
+        allow read: if signedIn() && inSubscription(
+          get(/databases/$(database)/documents/items/$(itemId)).data);
+        allow write: if false;
       }
-
-      match /holderHistory/{historyId} {
-        allow read: if isAuthenticated() &&
-          belongsToSub(get(/databases/$(database)/documents/items/$(itemId)).data);
-        allow write: if false; // Managed by Cloud Functions
+      match /holderHistory/{id} {
+        allow read: if signedIn() && inSubscription(
+          get(/databases/$(database)/documents/items/$(itemId)).data);
+        allow write: if false;
       }
     }
-
-    match /kits/{kitId} {
-      allow read: if isAuthenticated() && belongsToSub(resource.data);
-      allow write: if isAuthenticated() && isAnyAdmin();
-    }
-
-    match /transfers/{transferId} {
-      allow read: if isAuthenticated() && belongsToSub(resource.data);
-      allow create: if isAuthenticated();
-      // Clients may only decline a pending transfer (requester cancelling, the
-      // current holder/admin turning it down, or - for a holder/owner-
-      // initiated push transfer - the offered recipient turning it down),
-      // changing status+declinedAt and nothing else. Approval always goes
-      // through the transferItem Cloud Function, which is what actually
-      // moves holderId and writes holderHistory - never allow status to
-      // reach 'approved'/'transferred' via a direct client write.
-      allow update: if isAuthenticated() && (
-        request.auth.uid == resource.data.requestedByUserId ||
-        request.auth.uid == resource.data.currentHolderId ||
-        request.auth.uid == resource.data.targetUserId ||
-        isAnyAdmin()
-      ) && resource.data.status == 'pending'
-        && request.resource.data.status == 'declined'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'declinedAt']);
+    match /transfers/{id} {
+      allow read: if signedIn() && inSubscription(resource.data);
+      allow write: if false;
     }
   }
 }

@@ -1,0 +1,48 @@
+{
+  "score": 1,
+  "summary": "Critical tenant isolation and authority-source failures. Local emulator checks confirmed foreign-tenant catalog writes, forged transfer acceptance, comment impersonation, mutable group tenancy, and denied regular-user inbox queries. Direct user role-field updates are correctly blocked.",
+  "findings": [
+    {
+      "check": "Authority Source",
+      "severity": "critical",
+      "issue": "firestore.rules:99 permits arbitrary authenticated transfer creation; functions/src/index.ts:255 trusts those documents to authorize holder changes.",
+      "recommendation": "Validate transfer creation against item tenancy, holder/owner identity, recipient membership, pending status, and allowed fields; derive the destination from the validated transfer."
+    },
+    {
+      "check": "Field-Level vs. Identity-Level Security",
+      "severity": "critical",
+      "issue": "Catalog writes and transfer declines use isAnyAdmin without document subscription or group checks, permitting foreign-tenant writes. Item creates allow arbitrary holder assignments and deletion/recreation bypasses holder update restrictions.",
+      "recommendation": "Require matching subscription and the resource group's admin role, validate immutable scope fields, and restrict initial holder values."
+    },
+    {
+      "check": "The Update Bypass",
+      "severity": "major",
+      "issue": "firestore.rules:56 permits a group's superadmin to change subscriptionId without migrating memberships or catalog references.",
+      "recommendation": "Make group tenancy immutable and validate old and proposed document states."
+    },
+    {
+      "check": "Business Logic vs. Rules",
+      "severity": "major",
+      "issue": "TransferInbox holder/recipient queries omit the subscriptionId constraint required by firestore.rules:98; both fail with permission-denied.",
+      "recommendation": "Constrain both queries by the caller's subscription and display subscription/listener failures."
+    },
+    {
+      "check": "Authority Source",
+      "severity": "moderate",
+      "issue": "firestore.rules:82 allows posting comments on foreign items and supplying another user's identity.",
+      "recommendation": "Require parent item tenancy and userId equal to request.auth.uid; validate author display data and timestamps."
+    },
+    {
+      "check": "Storage Abuse",
+      "severity": "minor",
+      "issue": "Rules lack meaningful string/array limits for comments, profiles, and catalog documents; uploads have no size or content-type restriction. This creates resource exhaustion and cost risks.",
+      "recommendation": "Apply field allowlists, bounded strings/arrays, and image upload size/type checks."
+    },
+    {
+      "check": "Type Safety",
+      "severity": "minor",
+      "issue": "Profile and catalog rules do not require expected field types or validate related tenant/group references on create/update.",
+      "recommendation": "Validate required schemas and references on both creation and update while retaining the current role/tenant profile protection."
+    }
+  ]
+}

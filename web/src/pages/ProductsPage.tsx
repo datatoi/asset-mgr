@@ -1,19 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { saveCatalog, deleteCatalog } from '../lib/api';
+import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import type { Category, Group, Product } from '../types/models';
 
 const ProductsPage: React.FC = () => {
-  const { userData } = useAuth();
+  const { userData, isOwner } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
+
+  const isAdmin = canManage(userData, undefined, isOwner);
+  const selectedGroup = Form.useWatch('groupId', form);
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
@@ -24,7 +29,7 @@ const ProductsPage: React.FC = () => {
       where('subscriptionId', '==', userData.subscriptionId)
     );
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
     });
 
     // Sync Categories for the dropdown
@@ -33,13 +38,13 @@ const ProductsPage: React.FC = () => {
       where('subscriptionId', '==', userData.subscriptionId)
     );
     const unsubCategories = onSnapshot(qCategories, (snapshot) => {
-      setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category)));
+      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
     });
 
     // Sync Groups for the dropdown
     const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubGroups = onSnapshot(qGroups, (snapshot) => {
-      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+      setGroups(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group)));
     });
 
     return () => {
@@ -64,17 +69,9 @@ const ProductsPage: React.FC = () => {
   const onFinish = async (values: Pick<Product, 'name' | 'categoryId' | 'groupId' | 'gender' | 'imageUrl'>) => {
     if (!userData?.subscriptionId) return;
     try {
-      const data = {
-        ...values,
-        subscriptionId: userData.subscriptionId,
-      };
-      if (editingProduct) {
-        await updateDoc(doc(db, 'products', editingProduct.id), data);
-        message.success('Product updated');
-      } else {
-        await addDoc(collection(db, 'products'), data);
-        message.success('Product created');
-      }
+      const { name, categoryId, groupId, gender, imageUrl } = values;
+      await saveCatalog('products', { name, categoryId, groupId, gender, imageUrl }, editingProduct?.id);
+      message.success(editingProduct ? 'Updated successfully' : 'Created successfully');
       setIsModalOpen(false);
     } catch (err) {
       message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
@@ -112,9 +109,9 @@ const ProductsPage: React.FC = () => {
       key: 'action',
       render: (_: unknown, record: Product) => (
         <Space size="middle">
-          <Button type="link" onClick={() => handleEdit(record)}>Edit</Button>
-          <Popconfirm title="Sure to delete?" onConfirm={() => deleteDoc(doc(db, 'products', record.id))}>
-            <Button type="link" danger>Delete</Button>
+          <Button type="link" hidden={!canManage(userData, record.groupId, isOwner)} onClick={() => handleEdit(record)}>Edit</Button>
+          <Popconfirm title="Sure to delete?" onConfirm={() => deleteCatalog('products', record.id)}>
+            <Button type="link" danger hidden={!canManage(userData, record.groupId, isOwner)}>Delete</Button>
           </Popconfirm>
         </Space>
       ),
@@ -125,7 +122,7 @@ const ProductsPage: React.FC = () => {
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
         <h2>Products</h2>
-        <Button type="primary" onClick={handleAdd}>Add Product</Button>
+        <Button type="primary" hidden={!isAdmin} onClick={handleAdd}>Add Product</Button>
       </div>
       <Table dataSource={products} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
@@ -138,7 +135,7 @@ const ProductsPage: React.FC = () => {
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="imageUrl" label="Product Image">
-            <ImageUpload folder="products" />
+            <ImageUpload disabled={!selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/products`} />
           </Form.Item>
           <Form.Item
             name="name"
@@ -149,7 +146,7 @@ const ProductsPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="categoryId" label="Category" rules={[{ required: true }]}>
             <Select placeholder="Select Category">
-              {categories.map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
+              {categories.filter(c => c.groupId === selectedGroup).map(c => <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>)}
             </Select>
           </Form.Item>
           <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
@@ -160,8 +157,8 @@ const ProductsPage: React.FC = () => {
             </Select>
           </Form.Item>
           <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
-            <Select placeholder="Select Group">
-              {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ categoryId: undefined, imageUrl: undefined })} disabled={!!editingProduct?.groupId}>
+              {groups.filter(g => canManage(userData, g.id, isOwner)).map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
             </Select>
           </Form.Item>
         </Form>

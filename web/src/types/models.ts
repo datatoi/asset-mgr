@@ -12,7 +12,7 @@ import type { Timestamp } from 'firebase/firestore'
 export type Role = 'superadmin' | 'admin' | 'user' | 'joiner'
 export type Gender = 'male' | 'female' | 'unisex'
 export type Condition = 'new' | 'good' | 'worn' | 'damaged'
-export type TransferType = 'request' | 'admin' | 'scan'
+export type TransferType = 'request' | 'admin' | 'scan' | 'return'
 export type RequestStatus = 'pending' | 'approved' | 'declined' | 'transferred'
 
 /** holderId sentinel meaning "not currently checked out / available". See CLAUDE.md. */
@@ -81,10 +81,11 @@ export interface Item {
   rfidTag?: string
   description?: string
   holderId: string
+  holderVersion?: number
   // Long-term assigned person, distinct from holderId (who has it right now).
   // Admin/superadmin-editable directly (no Cloud Function/history - unlike
   // holderId, owner changes aren't audited, by design).
-  ownerId?: string
+  ownerId?: string | null
   createdAt?: Timestamp
   updatedAt?: Timestamp
 }
@@ -135,7 +136,10 @@ export interface TransferRequest {
   // accept before it moves. Absent for the older "pull" flow, where a
   // non-holder requests the item from whoever currently holds it and
   // `currentHolderId` themselves approves.
-  targetUserId?: string
+  targetUserId?: string | null
+  holderVersion?: number
+  schemaVersion?: number
+  declineReason?: string
   status: RequestStatus
   requestedAt?: Timestamp
   declinedAt?: Timestamp

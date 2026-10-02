@@ -31,17 +31,17 @@ import GroupsPage from './pages/GroupsPage';
 const { Header, Content, Sider } = Layout;
 
 const App: React.FC = () => {
-  const { userData } = useAuth();
+  const { userData, isOwner, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   const roles = Object.values(userData?.groups || {});
-  const isAdmin = roles.some(r => r === 'admin' || r === 'superadmin');
+  const isAdmin = isOwner || roles.some(r => r === 'admin' || r === 'superadmin');
   // A 'joiner' (default role from the invite-link flow, before an admin
   // grants a real role) can only reach their own Profile - see ProtectedRoute.
-  const isJoinerOnly = roles.length > 0 && roles.every(r => r === 'joiner');
+  const isJoinerOnly = !isOwner && !roles.some(r => ['user', 'admin', 'superadmin'].includes(r));
 
   const menuItems = isJoinerOnly ? [
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
@@ -89,6 +89,7 @@ const App: React.FC = () => {
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsed(!collapsed)}
             />
+            <Button style={{ marginLeft: 'auto' }} onClick={() => void logout()}>Sign out</Button>
           </Header>
         )}
         <Content style={{ margin: '24px 16px 0' }}>

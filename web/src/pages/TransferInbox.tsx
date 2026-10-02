@@ -1,134 +1,72 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tag, Button, Space, Card, Typography, message } from 'antd';
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebase';
+import { Table, Tag, Button, Space, Card, Typography, message, Tabs, Alert } from 'antd';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { call } from '../lib/api';
+import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
-import type { TransferRequest } from '../types/models';
-
-const { Title } = Typography;
+import type { TransferRequest, UserProfile } from '../types/models';
 
 const TransferInbox: React.FC = () => {
-  const { user, userData } = useAuth();
+  const { user, userData, isOwner } = useAuth();
   const [transfers, setTransfers] = useState<TransferRequest[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [members, setMembers] = useState<UserProfile[]>([]);
+  const [busy, setBusy] = useState<string>();
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
+    setTransfers([]);
+    setError(undefined);
     if (!userData?.subscriptionId) return;
+    const q = query(collection(db, 'transfers'), where('subscriptionId', '==', userData.subscriptionId));
+    const stop = onSnapshot(q, snap => {
+      setTransfers(snap.docs.map(d => ({ ...d.data(), id: d.id } as TransferRequest)));
+    }, e => setError(e.message));
+    const stopMembers = onSnapshot(query(collection(db, 'users'), where('subscriptionId', '==', userData.subscriptionId)), snap => {
+      setMembers(snap.docs.map(d => ({ ...d.data(), id: d.id } as UserProfile)));
+    }, e => setError(e.message));
+    return () => { stop(); stopMembers(); };
+  }, [userData?.subscriptionId]);
 
-    // Admin sees all pending. A regular user sees transfers where they need
-    // to act: either they're the current holder being asked to release the
-    // item (the "pull" flow), or they're the named recipient of a
-    // holder/owner-initiated "push" transfer offer (ItemDetail's
-    // "Transfer to..." control).
-    const isAdmin = Object.values(userData.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+  const admin = (r: TransferRequest) => canManage(userData, r.groupId, isOwner);
+  const participant = (r: TransferRequest) => [r.requestedByUserId, r.currentHolderId, r.targetUserId].includes(user?.uid);
+  const canApprove = (r: TransferRequest) => admin(r) || (r.targetUserId ? r.targetUserId === user?.uid : r.currentHolderId === user?.uid);
+  const canDecline = (r: TransferRequest) => admin(r) || participant(r);
+  const name = (uid: string) => uid === 'storage' ? 'Storage' : members.find(m => m.id === uid)?.name || uid;
 
-    if (isAdmin) {
-      const q = query(collection(db, 'transfers'), where('subscriptionId', '==', userData.subscriptionId), where('status', '==', 'pending'));
-      const unsubscribe = onSnapshot(q, (snap) => {
-        setTransfers(snap.docs.map(d => ({ id: d.id, ...d.data() } as TransferRequest)));
-      });
-      return () => unsubscribe();
-    }
-
-    const asHolder = new Map<string, TransferRequest>();
-    const asTarget = new Map<string, TransferRequest>();
-    const merge = () => setTransfers([...asHolder.values(), ...asTarget.values()].filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i));
-
-    const qHolder = query(collection(db, 'transfers'), where('currentHolderId', '==', user?.uid), where('status', '==', 'pending'));
-    const unsubHolder = onSnapshot(qHolder, (snap) => {
-      asHolder.clear();
-      snap.docs.forEach(d => asHolder.set(d.id, { id: d.id, ...d.data() } as TransferRequest));
-      merge();
-    });
-
-    const qTarget = query(collection(db, 'transfers'), where('targetUserId', '==', user?.uid), where('status', '==', 'pending'));
-    const unsubTarget = onSnapshot(qTarget, (snap) => {
-      asTarget.clear();
-      snap.docs.forEach(d => asTarget.set(d.id, { id: d.id, ...d.data() } as TransferRequest));
-      merge();
-    });
-
-    return () => { unsubHolder(); unsubTarget(); };
-  }, [user, userData]);
-
-  const handleAction = async (record: TransferRequest, action: 'approved' | 'declined') => {
-    setLoading(true);
+  const action = async (r: TransferRequest, approve: boolean) => {
+    setBusy(r.id);
     try {
-      if (action === 'approved') {
-        const transferItemFn = httpsCallable(functions, 'transferItem');
-        await transferItemFn({
-          itemId: record.itemId,
-          newHolderId: record.targetUserId || record.requestedByUserId,
-          transferType: 'request',
-          transferId: record.id // Pass transferId to handle status update in Cloud Function
-        });
-        message.success('Item transferred!');
-      } else {
-        await updateDoc(doc(db, 'transfers', record.id), {
-          status: 'declined',
-          declinedAt: serverTimestamp()
-        });
-        message.success('Transfer declined');
-      }
-    } catch (error) {
-      console.error(error);
-      message.error('Failed to process transfer');
-    } finally {
-      setLoading(false);
-    }
+      await call(approve ? 'transferItem' : 'declineTransfer', approve ? { itemId: r.itemId, transferId: r.id } : { transferId: r.id });
+      message.success(approve ? 'Item transferred' : 'Request closed');
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Could not process request');
+    } finally { setBusy(undefined); }
   };
-
   const columns = [
-    { title: 'Requested At', dataIndex: 'requestedAt', render: (d: TransferRequest['requestedAt']) => d?.toDate()?.toLocaleString() },
-    { title: 'Item ID', dataIndex: 'itemId' },
-    {
-      title: 'Type',
-      key: 'type',
-      render: (_: unknown, record: TransferRequest) => record.targetUserId
-        ? <Tag color="blue">Offered to you</Tag>
-        : <Tag color="purple">Requested from you</Tag>
-    },
-    { title: 'Initiated By', dataIndex: 'requestedByUserId' },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      render: (s: string) => <Tag color="gold">{s.toUpperCase()}</Tag>
-    },
-    {
-      title: 'Action',
-      key: 'action',
-      render: (_: unknown, record: TransferRequest) => (
-        <Space>
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => handleAction(record, 'approved')}
-            loading={loading}
-          >
-            {record.targetUserId ? 'Accept & Transfer' : 'Approve & Transfer'}
-          </Button>
-          <Button
-            danger
-            size="small"
-            onClick={() => handleAction(record, 'declined')}
-            loading={loading}
-          >
-            Decline
-          </Button>
-        </Space>
-      ),
-    },
+    { title: 'Requested', dataIndex: 'requestedAt', render: (d: TransferRequest['requestedAt']) => d?.toDate()?.toLocaleString() },
+    { title: 'Item', dataIndex: 'itemId', render: (id: string) => <a href={`/items/${id}`}>{id}</a> },
+    { title: 'Initiated by', dataIndex: 'requestedByUserId', render: name },
+    { title: 'Recipient', render: (_: unknown, r: TransferRequest) => name(r.targetUserId || r.requestedByUserId) },
+    { title: 'Status', render: (_: unknown, r: TransferRequest) => <Space><Tag>{r.status}</Tag>{r.declineReason === 'holder-changed' && 'Item assigned elsewhere'}</Space> },
+    { title: 'Action', render: (_: unknown, r: TransferRequest) => r.status === 'pending' && (
+      <Space wrap>
+        {r.schemaVersion !== 2 && <span>Old request: cancel and create it again</span>}
+        {canApprove(r) && r.schemaVersion === 2 && <Button type="primary" loading={busy === r.id} onClick={() => action(r, true)}>{r.targetUserId ? 'Accept & Transfer' : 'Approve & Transfer'}</Button>}
+        {canDecline(r) && <Button danger loading={busy === r.id} onClick={() => action(r, false)}>{r.requestedByUserId === user?.uid ? 'Cancel' : 'Decline'}</Button>}
+      </Space>
+    ) },
   ];
-
-  return (
-    <div style={{ padding: 24 }}>
-      <Card>
-        <Title level={2}>Pending Transfers</Title>
-        <Table dataSource={transfers} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
-      </Card>
-    </div>
-  );
+  const visible = transfers.filter(r => admin(r) || participant(r)).sort((a, b) => (b.requestedAt?.toMillis() || 0) - (a.requestedAt?.toMillis() || 0));
+  const table = (rows: TransferRequest[]) => <Table dataSource={rows} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />;
+  return <div style={{ padding: 24 }}><Card>
+    <Typography.Title level={2}>Transfers</Typography.Title>
+    {error && <Alert type="error" showIcon title={error} />}
+    <Tabs items={[
+      { key: 'pending', label: 'Pending', children: table(visible.filter(r => r.status === 'pending' && canApprove(r))) },
+      { key: 'outgoing', label: 'My requests and offers', children: table(visible.filter(r => r.requestedByUserId === user?.uid)) },
+      { key: 'history', label: 'History', children: table(visible.filter(r => r.status !== 'pending')) },
+    ]} />
+  </Card></div>;
 };
-
 export default TransferInbox;

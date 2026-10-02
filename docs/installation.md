@@ -22,7 +22,7 @@ missing. Read on for what the script is doing, or to run the steps by hand.
 
 ## Prerequisites
 
-- Node.js 20+ and npm
+- Node.js 24+ and npm (matches the configured Cloud Functions runtime)
 - A Google account
 - [`gcloud` CLI](https://cloud.google.com/sdk/docs/install), logged in: `gcloud auth login`
 - [`firebase` CLI](https://firebase.google.com/docs/cli): `npm install -g firebase-tools`, logged in: `firebase login`
@@ -199,3 +199,14 @@ registration and roles work.
 - **EU Storage bucket needs Blaze** — the free-tier auto-provisioned bucket
   only supports `us-east1`; any other region requires Blaze billing enabled
   first (step 5 before step 4, if starting from scratch on the free tier).
+
+
+## Updating an existing installation after the audit fixes
+
+See [audit-fixes.md](audit-fixes.md) before rolling out this update. Deploy functions,
+Firestore rules/indexes, Storage rules, and the rebuilt web app together during a
+maintenance window: the web now sends all document writes through callables.
+Existing pending transfers must be cancelled and recreated; new approval handlers
+reject the old unvalidated request schema. Old catalog image paths remain readable,
+but new uploads use tenant/group paths. The subscription owner can assign missing
+legacy catalog groups through the existing edit forms, starting with categories.

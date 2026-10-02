@@ -30,7 +30,7 @@ step() { echo; echo "==> $*"; }
 step "Checking prerequisites"
 command -v gcloud >/dev/null || { echo "gcloud CLI not found. See https://cloud.google.com/sdk/docs/install"; exit 1; }
 command -v firebase >/dev/null || { echo "firebase CLI not found. Run: npm install -g firebase-tools"; exit 1; }
-command -v npm >/dev/null || { echo "npm not found. Install Node.js 20+."; exit 1; }
+command -v npm >/dev/null || { echo "npm not found. Install Node.js 24+."; exit 1; }
 gcloud auth print-access-token >/dev/null 2>&1 || { echo "Not logged in to gcloud. Run: gcloud auth login"; exit 1; }
 firebase projects:list >/dev/null 2>&1 || { echo "Not logged in to firebase. Run: firebase login"; exit 1; }
 
@@ -122,7 +122,7 @@ npm --prefix web install
 npm --prefix functions install
 
 step "8/9 Deploy security rules and Cloud Functions"
-firebase deploy --only firestore:rules --project="$PROJECT_ID"
+firebase deploy --only firestore --project="$PROJECT_ID"
 firebase deploy --only storage --project="$PROJECT_ID"
 
 # storage.rules calls firestore.get() (cross-service rules) to check the

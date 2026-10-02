@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, functions } from '../lib/firebase';
+import { saveCatalog, deleteCatalog } from '../lib/api';
+import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import { httpsCallable } from 'firebase/functions';
 import type { Group, Kit, Product } from '../types/models';
 
 const KitsPage: React.FC = () => {
-  const { userData } = useAuth();
+  const { userData, isOwner } = useAuth();
   const [kits, setKits] = useState<Kit[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -16,24 +18,27 @@ const KitsPage: React.FC = () => {
   const [requestLoading, setRequestLoading] = useState<string | null>(null);
   const [form] = Form.useForm();
 
-  const isAdmin = Object.values(userData?.groups || {}).some(r => r === 'admin' || r === 'superadmin');
+
+
+  const isAdmin = canManage(userData, undefined, isOwner);
+  const selectedGroup = Form.useWatch('groupId', form);
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
 
     const qKits = query(collection(db, 'kits'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubKits = onSnapshot(qKits, (snapshot) => {
-      setKits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Kit)));
+      setKits(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Kit)));
     });
 
     const qProducts = query(collection(db, 'products'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubProducts = onSnapshot(qProducts, (snapshot) => {
-      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product)));
+      setProducts(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Product)));
     });
 
     const qGroups = query(collection(db, 'groups'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubGroups = onSnapshot(qGroups, (snapshot) => {
-      setGroups(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Group)));
+      setGroups(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group)));
     });
 
     return () => { unsubKits(); unsubProducts(); unsubGroups(); };
@@ -55,14 +60,9 @@ const KitsPage: React.FC = () => {
   const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'productIds' | 'description' | 'groupId'>) => {
     if (!userData?.subscriptionId) return;
     try {
-      const data = { ...values, subscriptionId: userData.subscriptionId };
-      if (editingKit) {
-        await updateDoc(doc(db, 'kits', editingKit.id), data);
-        message.success('Kit updated');
-      } else {
-        await addDoc(collection(db, 'kits'), data);
-        message.success('Kit created');
-      }
+      const { name, gender, productIds, description, groupId } = values;
+      await saveCatalog('kits', { name, gender, productIds, description, groupId }, editingKit?.id);
+      message.success(editingKit ? 'Updated successfully' : 'Created successfully');
       setIsModalOpen(false);
     } catch (err) {
       message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
@@ -89,20 +89,13 @@ const KitsPage: React.FC = () => {
       title: 'Action',
       render: (_: unknown, record: Kit) => (
         <Space>
-          {isAdmin ? (
+          <Button onClick={() => handleRequest(record.id)} loading={requestLoading === record.id}>Request Kit</Button>
+          {canManage(userData, record.groupId, isOwner) ? (
             <>
               <Button type="link" onClick={() => { setEditingKit(record); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
-              <Popconfirm title="Delete?" onConfirm={() => deleteDoc(doc(db, 'kits', record.id))}><Button type="link" danger>Delete</Button></Popconfirm>
+              <Popconfirm title="Delete?" onConfirm={() => deleteCatalog('kits', record.id)}><Button type="link" danger>Delete</Button></Popconfirm>
             </>
-          ) : (
-            <Button
-              type="primary"
-              onClick={() => handleRequest(record.id)}
-              loading={requestLoading === record.id}
-            >
-              Request Kit
-            </Button>
-          )}
+          ) : null}
         </Space>
       ),
     },
@@ -124,13 +117,13 @@ const KitsPage: React.FC = () => {
           </Form.Item>
           <Form.Item name="productIds" label="Required Products" rules={[{ required: true }]}>
             <Select mode="multiple" placeholder="Select what makes this kit complete">
-              {products.map(p => <Select.Option key={p.id} value={p.id}>{p.name}</Select.Option>)}
+              {products.filter(p => p.groupId === selectedGroup).map(p => <Select.Option key={p.id} value={p.id}>{p.name}</Select.Option>)}
             </Select>
           </Form.Item>
           <Form.Item name="description" label="Description"><Input.TextArea /></Form.Item>
           <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
-            <Select placeholder="Select Group">
-              {groups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ productIds: undefined })} disabled={!!editingKit?.groupId}>
+              {groups.filter(g => canManage(userData, g.id, isOwner)).map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
             </Select>
           </Form.Item>
         </Form>

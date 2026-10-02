@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Form, Input, Button, Card, Typography, Select, message, Space } from 'antd';
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { call } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
 import type { Category, Gender } from '../types/models';
@@ -12,19 +13,21 @@ const ProfilePage: React.FC = () => {
   const { user, userData, loading: authLoading } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
   const [form] = Form.useForm();
+  const initializedProfileId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
     const q = query(collection(db, 'categories'), where('subscriptionId', '==', userData.subscriptionId));
     const unsubscribe = onSnapshot(q, (snap) => {
-      setCategories(snap.docs.map(d => ({ id: d.id, ...d.data() } as Category)));
+      setCategories(snap.docs.map(d => ({ ...d.data(), id: d.id } as Category)));
     });
     return () => unsubscribe();
   }, [userData?.subscriptionId]);
 
   useEffect(() => {
-    if (userData) {
+    if (userData && initializedProfileId.current !== userData.id) {
       form.setFieldsValue(userData);
+      initializedProfileId.current = userData.id;
     }
   }, [userData, form]);
 
@@ -33,17 +36,19 @@ const ProfilePage: React.FC = () => {
   const selectedGender = Form.useWatch('gender', form) ?? userData?.gender;
   const visibleCategories = categories.filter(c => c.gender === 'unisex' || c.gender === selectedGender);
 
-  const onFinish = async (values: { name?: string; avatarUrl?: string; gender?: Gender; sizes?: Record<string, string> }) => {
+  const handleAvatarChange = async (avatarUrl: string) => {
+    if (!user) throw new Error('Sign in to update your profile picture.');
+    await call('updateProfile', { avatarUrl });
+  };
+
+  const onFinish = async (values: { name?: string; gender?: Gender; sizes?: Record<string, string> }) => {
     if (!user) return;
     try {
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, {
-        ...values,
-        updatedAt: new Date().toISOString(),
-      });
+      const { name, gender, sizes } = values;
+      await call('updateProfile', { name, gender, sizes });
       message.success('Profile updated successfully');
     } catch (error) {
-      message.error('Failed to update profile');
+      message.error(error instanceof Error ? error.message : 'Failed to update profile');
     }
   };
 
@@ -59,8 +64,12 @@ const ProfilePage: React.FC = () => {
           onFinish={onFinish}
           initialValues={userData || {}}
         >
-          <Form.Item name="avatarUrl" label="Profile Picture">
-            <ImageUpload folder="avatars" />
+          <Form.Item label="Profile Picture">
+            <ImageUpload
+              value={userData?.avatarUrl || undefined}
+              onChange={handleAvatarChange}
+              folder={`avatars/${user?.uid}`}
+            />
           </Form.Item>
 
           <Form.Item label="Name" name="name" rules={[{ required: true }]}>

@@ -149,3 +149,14 @@ Firestore + Storage security rules. Still ahead:
   rules enforce this; see [CLAUDE.md#authorization-principles](CLAUDE.md).
 - Emulator suite (`firebase emulators:start`) covers auth/firestore/storage/
   functions/hosting for local dev; toggle with `VITE_USE_EMULATORS` in `web/.env`.
+
+
+## Shared kits and write validation (October 2026)
+
+Kit definitions reference products that can be reused in many kits. Inventory is
+shared, and pending requests may compete for one item. Transactional approval
+increments the holder version and closes the other pending requests for that item.
+All Firestore writes now pass through callable functions; client rules are read-only.
+Catalog/role/transfer operations validate tenancy and the actual group role, with
+subscription-owner authority. See CLAUDE.md and docs/audit-fixes.md for the current
+function endpoints, data limits, image paths, and rollout steps.

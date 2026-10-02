@@ -4,6 +4,10 @@
 > the build plan lives in [todo.md](todo.md). This document is the full product
 > brief (v2, revised after scoping).
 
+> Current clarification: products and physical items may be shared across multiple
+> kit definitions. Pending requests may compete; the first valid approval wins.
+> See CLAUDE.md for current callable write paths and authorization.
+
 ## Objective
 Build a multi-tenant, **open-source, self-hosted** web + mobile application to
 manage shared costumes for organizations such as folk dance groups. Each

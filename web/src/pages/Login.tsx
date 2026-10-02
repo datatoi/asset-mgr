@@ -13,7 +13,7 @@ const LoginPage: React.FC = () => {
 
   React.useEffect(() => {
     if (!loading && user) {
-      if (userData) {
+      if (userData?.subscriptionId) {
         navigate('/dashboard');
       } else {
         navigate('/register');

@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { Spin } from 'antd';
 
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, userData } = useAuth();
+  const { user, loading, userData, isOwner } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -16,7 +16,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   // If user is logged in but has no subscription data, redirect to registration
-  if (!userData && location.pathname !== '/register') {
+  if (!userData?.subscriptionId && location.pathname !== '/register') {
     return <Navigate to="/register" replace />;
   }
 
@@ -24,8 +24,8 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
   // admin promotes them - see joinSubscription) can only see their own
   // Profile page, so any other route bounces them there.
   const roles = Object.values(userData?.groups || {});
-  const isJoinerOnly = roles.length > 0 && roles.every(r => r === 'joiner');
-  if (isJoinerOnly && location.pathname !== '/profile') {
+  const isJoinerOnly = !roles.some(r => ['user', 'admin', 'superadmin'].includes(r));
+  if (!isOwner && isJoinerOnly && location.pathname !== '/profile') {
     return <Navigate to="/profile" replace />;
   }
 
