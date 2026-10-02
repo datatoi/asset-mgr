@@ -5,12 +5,13 @@ import { ArrowLeftOutlined, InboxOutlined, MenuOutlined, SkinOutlined, TeamOutli
 import { useAuth } from '../auth/AuthContext';
 import { canManage } from '../auth/permissions';
 import { ProtectedRoute } from '../auth/ProtectedRoute';
-import Dashboard from '../pages/Dashboard';
+import MobileInventory from './MobileInventory';
 import ItemsPage from '../pages/ItemsPage';
 import ItemDetail from '../pages/ItemDetail';
 import KitsPage from '../pages/KitsPage';
+import MobileKits from './MobileKits';
 import ProfilePage from '../pages/ProfilePage';
-import TransferInbox from '../pages/TransferInbox';
+import MobileTransfers from './MobileTransfers';
 import CategoriesPage from '../pages/CategoriesPage';
 import ProductsPage from '../pages/ProductsPage';
 import MembersPage from '../pages/MembersPage';
@@ -23,7 +24,7 @@ import './mobile.css';
 const titles: Record<string, string> = {
   '/': 'My items', '/dashboard': 'My items', '/items': 'Inventory', '/kits': 'Kits',
   '/transfers': 'Transfers', '/profile': 'Profile', '/categories': 'Categories',
-  '/products': 'Products', '/members': 'Members', '/groups': 'Groups',
+  '/products': 'Products', '/members': 'Members', '/groups': 'Groups', '/manage/items': 'Manage items', '/manage/kits': 'Manage kits',
 };
 
 export default function MobileApp() {
@@ -47,7 +48,7 @@ export default function MobileApp() {
     { path: '/items', label: 'Browse inventory' },
     { path: '/categories', label: 'Categories' },
     { path: '/products', label: 'Products' },
-    ...(admin ? [{ path: '/members', label: 'Members' }, { path: '/groups', label: 'Groups' }] : []),
+    ...(admin ? [{ path: '/manage/items', label: 'Manage items' }, { path: '/manage/kits', label: 'Manage kits' }, { path: '/members', label: 'Members' }, { path: '/groups', label: 'Groups' }] : []),
   ];
   return <ConfigProvider componentSize="large" theme={{ token: { controlHeightLG: 48, borderRadius: 12 } }}>
     <div className={`mobile-app${publicPage ? ' mobile-public' : ''}`}>
@@ -61,13 +62,15 @@ export default function MobileApp() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/join/:subscriptionId" element={<JoinPage />} />
-          <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
+          <Route path="/" element={<ProtectedRoute><MobileInventory /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><MobileInventory /></ProtectedRoute>} />
+          <Route path="/items" element={<ProtectedRoute><MobileInventory browse /></ProtectedRoute>} />
           <Route path="/items/:id" element={<ProtectedRoute><ItemDetail /></ProtectedRoute>} />
-          <Route path="/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
-          <Route path="/transfers" element={<ProtectedRoute><TransferInbox /></ProtectedRoute>} />
+          <Route path="/kits" element={<ProtectedRoute><MobileKits /></ProtectedRoute>} />
+          <Route path="/transfers" element={<ProtectedRoute><MobileTransfers /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+          <Route path="/manage/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />
+          <Route path="/manage/kits" element={<ProtectedRoute><KitsPage /></ProtectedRoute>} />
           <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
           <Route path="/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
           <Route path="/members" element={<ProtectedRoute><MembersPage /></ProtectedRoute>} />
