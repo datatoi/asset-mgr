@@ -47,7 +47,7 @@ const DesktopApp: React.FC = () => {
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
   ] : [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
-    { key: '/items', icon: <SkinOutlined />, label: 'Items' },
+    { key: '/items', icon: <SkinOutlined />, label: 'Inventory' },
     { key: '/categories', icon: <GroupOutlined />, label: 'Categories' },
     { key: '/products', icon: <TagsOutlined />, label: 'Products' },
     { key: '/kits', icon: <InboxOutlined />, label: 'Kits' },

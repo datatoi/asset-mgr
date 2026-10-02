@@ -85,7 +85,7 @@ hosted-SaaS billing/operator model.
 
 ## Data model (Firestore)
 
-Catalog hierarchy: **Category → Product → Item**, plus **Kit** (checkout unit).
+Catalog hierarchy: **Category → Product → Item**, plus **Kit** (outfit definition used to group inventory).
 
 - `subscriptions/{subId}` — `ownerUserId`, `name`, `createdAt`
 - `groups/{groupId}` — `subscriptionId`, `name`, `description`, `createdAt`,
@@ -162,13 +162,19 @@ available items.
   being set directly by the client, on both `create` and `update` (see
   Authorization principles) — otherwise anyone could self-grant a role in any
   group just by knowing its ID.
-- **Kit request / checkout**: user requests a kit → backend resolves each
-  required product's category, looks up the requester's `sizes[categoryId]`
-  (rejecting with a clear error if not set), then **auto-picks an available
-  item** of that product matching that size and the user's **gender** (including unisex garments), fails
-  gracefully if none available → generates one `transfers` doc per item. This operation creates all requests
-  atomically, supports shared product requirements across kits, and does not reserve
-  inventory. Duplicate pending requests for the same kit from the same user are rejected.
+- **Inventory requests**: Dashboard presents photo cards and defaults to the caller's
+  held items; Inventory presents a sortable management table and defaults to all
+  items. Both reuse `InventoryBrowser` for search, filters, sorting, and grouping
+  by owner, kit, or owner + kit. Kit membership is derived from a matching product
+  in the same group; it does not imply that an outfit is complete or exclusively
+  allocated. An item shared across kits may appear in several sections.
+  `requestItems` accepts 1–100 distinct, explicit item IDs and creates pull requests
+  atomically after validating tenant/group membership and actual item state.
+  Items already held by the caller or already requested by them are skipped.
+  UI confirmation lists the exact garments; no size-based substitutions occur.
+  Each item still requires an independent holder/admin approval. Request Kit
+  buttons are removed from desktop and mobile; kit pages describe outfit definitions.
+  The legacy `requestKit` callable remains for compatibility with older clients.
 - **Approval ("pull")**: a non-holder calls `createTransfer` from `ItemDetail`
   (`requestedByUserId` = requester, no `targetUserId`); the current holder (or
   admin) approves/declines. On approval, backend updates `holderId`, appends

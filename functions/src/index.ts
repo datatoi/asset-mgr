@@ -625,6 +625,58 @@ export const createTransfer = onCall(async (request) => {
   return {transferId: ref.id};
 });
 
+/** Request explicit inventory items atomically. */
+export const requestItems = onCall(async (request) => {
+  const uid = caller(request);
+  fields(request.data, ["itemIds"]);
+  if (!Array.isArray(request.data.itemIds) ||
+      !request.data.itemIds.length || request.data.itemIds.length > 100) {
+    throw new HttpsError("invalid-argument", "Select 1 to 100 items.");
+  }
+  const itemIds: string[] = request.data.itemIds.map(
+    (value: unknown) => id(value, "itemId")
+  );
+  if (new Set(itemIds).size !== itemIds.length) {
+    throw new HttpsError("invalid-argument", "Duplicate items.");
+  }
+  return db.runTransaction(async (tx) => {
+    const selected: {itemId: string; item: Data}[] = [];
+    let skipped = 0;
+    for (const itemId of itemIds) {
+      const {item} = await itemScope(tx, uid, itemId);
+      const existing = await tx.get(db.collection("transfers")
+        .where("itemId", "==", itemId)
+        .where("requestedByUserId", "==", uid)
+        .where("status", "==", "pending"));
+      if (item.holderId === uid || existing.docs.some(
+        (doc) => !doc.data().targetUserId
+      )) {
+        skipped++;
+      } else {
+        selected.push({itemId, item});
+      }
+    }
+    const transferIds: string[] = [];
+    for (const {itemId, item} of selected) {
+      const ref = db.collection("transfers").doc();
+      tx.create(ref, {
+        subscriptionId: item.subscriptionId,
+        groupId: item.groupId,
+        itemId,
+        requestedByUserId: uid,
+        currentHolderId: item.holderId,
+        targetUserId: null,
+        status: "pending",
+        requestedAt: now(),
+        holderVersion: item.holderVersion || 0,
+        schemaVersion: 2,
+      });
+      transferIds.push(ref.id);
+    }
+    return {success: true, transferIds, skipped};
+  });
+});
+
 /** First valid approval wins; stale/replayed requests cannot move the item. */
 export const transferItem = onCall(async (request) => {
   const uid = caller(request);

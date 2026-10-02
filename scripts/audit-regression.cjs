@@ -61,6 +61,50 @@ async function client(name, signedIn = true) {
   const product = await call('saveCatalog', owner.uid, { collection: 'products', values: { groupId: G, categoryId: 'categoryA', name: 'Shared shirt', gender: 'unisex' } });
   const newItem = async () => (await call('saveCatalog', owner.uid, { collection: 'items', values: { groupId: G, productId: product.id, size: 'M', gender: 'unisex', condition: 'good' } })).id;
   const itemId = await newItem();
+  await test('Bulk requests bind exact items and current holders', async () => {
+    const a = await newItem(); const b = await newItem();
+    await call('transferItem', owner.uid, { itemId: b, newHolderId: other.uid });
+    const result = await call('requestItems', user.uid, { itemIds: [a, b] });
+    assert.equal(result.transferIds.length, 2);
+    const records = await Promise.all(result.transferIds.map(x => db.doc(`transfers/${x}`).get()));
+    assert.deepEqual(records.map(x => x.data().itemId).sort(), [a, b].sort());
+    assert.equal(records.find(x => x.data().itemId === b).data().currentHolderId, other.uid);
+    for (const record of records) {
+      assert.equal(record.data().requestedByUserId, user.uid);
+      assert.equal(record.data().schemaVersion, 2);
+      assert.equal(record.data().status, 'pending');
+    }
+  });
+  await test('Bulk requests skip held and already requested garments', async () => {
+    const a = await newItem(); const b = await newItem(); const c = await newItem();
+    await call('transferItem', owner.uid, { itemId: a, newHolderId: user.uid });
+    await call('createTransfer', user.uid, { itemId: b });
+    const result = await call('requestItems', user.uid, { itemIds: [a, b, c] });
+    assert.equal(result.skipped, 2); assert.equal(result.transferIds.length, 1);
+    assert.equal((await db.doc(`transfers/${result.transferIds[0]}`).get()).data().itemId, c);
+    const retry = await call('requestItems', user.uid, { itemIds: [a, b, c] });
+    assert.equal(retry.skipped, 3); assert.equal(retry.transferIds.length, 0);
+  });
+  await test('Bulk requests validate authentication, bounds and authority fields', async () => {
+    await denied(() => api.requestItems.run({ data: { itemIds: [itemId] } }), 'unauthenticated');
+    for (const data of [{ itemIds: [] }, { itemIds: [itemId, itemId] }, { itemIds: Array(101).fill(itemId) }, { itemIds: ['bad/id'] }, { itemIds: [itemId], requestedByUserId: other.uid }]) {
+      await denied(() => call('requestItems', user.uid, data), 'invalid-argument');
+    }
+  });
+  await test('An unauthorized or missing item aborts the whole bulk request', async () => {
+    const a = await newItem();
+    await db.doc('items/foreign-bulk').set({ subscriptionId: 'subB', groupId: 'groupB', productId: 'foreign', holderId: 'storage' });
+    await denied(() => call('requestItems', user.uid, { itemIds: [a, 'foreign-bulk'] }));
+    await denied(() => call('requestItems', user.uid, { itemIds: [a, 'missing-bulk'] }), 'not-found');
+    assert.equal((await db.collection('transfers').where('itemId', '==', a).get()).size, 0);
+  });
+  await test('Bulk requests reject joiners and concurrent duplicate requests', async () => {
+    const a = await newItem();
+    await db.doc('users/bulk-joiner').set({ subscriptionId: A, groups: { [G]: 'joiner' } });
+    await denied(() => call('requestItems', 'bulk-joiner', { itemIds: [a] }));
+    const results = await Promise.all([call('requestItems', user.uid, { itemIds: [a] }), call('requestItems', user.uid, { itemIds: [a] })]);
+    assert.equal(results.reduce((n, r) => n + r.transferIds.length, 0), 1);
+  });
   await test('Unauthenticated catalog query denied', () => denied(() => sdk.getDocs(sdk.collection(anonymous.store, 'items'))));
   await test('Foreign tenant catalog read denied', () => denied(() => sdk.getDoc(sdk.doc(foreign.store, 'items', itemId))));
   await test('Direct catalog create/update/delete denied even for admins', async () => {

@@ -5,12 +5,24 @@ The React web app selects a separate phone interface below **768 CSS pixels**. A
 ## Phone navigation
 
 - **My items:** garments currently held by you, with quick Available/All views.
-- **Kits:** required products, group and gender, profile size link, request action.
+- **Kits:** outfit definitions with required products, group and gender; requests start in inventory.
 - **Transfers:** pending approvals, your outgoing requests/offers, and history.
 - **Profile:** avatar upload, name, gender and category sizes.
 - **More:** browse inventory, categories/products, permitted administration links, invite link and sign-out. Members awaiting promotion see only their profile and sign-out.
 
-Inventory uses photo cards. Search matches product names or NFC tag text; the filter drawer supports group, category, product, holder, owner and size. Selecting a holder switches to All so the My items/Available quick filter does not hide that person's garments.
+Inventory uses the shared `InventoryBrowser` with photo cards. Search matches
+product names, people, kit names, descriptions, sizes and NFC tags. Its bottom
+filter drawer includes group, category, product, holder, owner, kit and size,
+plus sorting and owner/kit grouping. My items and Available are quick filters.
+The desktop Dashboard uses the same browser with photo cards; Inventory uses
+sortable tables and retains administrative editing actions.
+
+Group requests show the exact garments for review and call `requestItems` with
+up to 100 distinct item IDs. Requests are created atomically, skipping items the
+caller already holds or already requested. Each request still needs holder/admin
+approval. Products shared across kits may appear under several kit headings;
+requesting across headings never duplicates an item. Kit headings describe matching
+inventory and may represent incomplete outfits.
 
 Item details show owner/holder, size, gender, condition, description and tag; comments and holder history use stacked entries. Members can request items, offer owned/held items, and return held items to storage. Administrators can change owner metadata and directly change holder, with the same history logging and backend authorization as desktop.
 
@@ -28,7 +40,7 @@ Administration uses the existing form and cell/action logic with card lists and 
 
 Styles are scoped to the mobile shell or mobile editor classes. The viewport supports display safe areas, bottom navigation reserves content space, fields use 16px text, and primary controls use 48px heights.
 
-Authentication, image upload and all writes reuse the existing Firebase SDK setup and callable APIs. No database schema, functions, Firestore rules or Storage rules were changed for this interface. This is the **mobile web UI**; the planned React Native NFC scanner is a separate application.
+Authentication, image upload and all writes reuse the existing Firebase SDK setup and callable APIs. Grouped inventory requests add the `requestItems` callable; database schema, Firestore rules and Storage rules are unchanged. This is the **mobile web UI**; the planned React Native NFC scanner is a separate application.
 
 ## Delivery status — 2 October 2026
 

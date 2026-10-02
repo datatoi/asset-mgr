@@ -2,11 +2,10 @@ import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
 import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db, functions } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { saveCatalog, deleteCatalog } from '../lib/api';
 import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
-import { httpsCallable } from 'firebase/functions';
 import type { Group, Kit, Product } from '../types/models';
 
 const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
@@ -16,7 +15,6 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKit, setEditingKit] = useState<Kit | null>(null);
-  const [requestLoading, setRequestLoading] = useState<string | null>(null);
   const [form] = Form.useForm();
 
 
@@ -44,19 +42,6 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
     return () => { unsubKits(); unsubProducts(); unsubGroups(); };
   }, [userData]);
-
-  const handleRequest = async (kitId: string) => {
-    setRequestLoading(kitId);
-    try {
-      const requestKitFn = httpsCallable(functions, 'requestKit');
-      await requestKitFn({ kitId });
-      message.success('Kit requested successfully! Individual item requests have been created.');
-    } catch (err) {
-      message.error('Failed to request kit: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setRequestLoading(null);
-    }
-  };
 
   const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'productIds' | 'description' | 'groupId'>) => {
     if (!userData?.subscriptionId) return;
@@ -90,7 +75,6 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       title: 'Action',
       render: (_: unknown, record: Kit) => (
         <Space>
-          <Button onClick={() => handleRequest(record.id)} loading={requestLoading === record.id}>Request Kit</Button>
           {canManage(userData, record.groupId, isOwner) ? (
             <>
               <Button type="link" onClick={() => { setEditingKit(record); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
