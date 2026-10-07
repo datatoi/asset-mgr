@@ -69,3 +69,25 @@ Existing pending transfers lack the new trusted request schema/holder version. T
 Legacy catalog records without `groupId` can be repaired by the subscription owner through the edit forms. Assign categories first, then their products, items and kits to the same group. Legacy image URLs remain readable; new product/item uploads require the scoped path. User avatars retain their existing path.
 
 Node.js 24 is required by the updated backend dependencies. The mobile NFC application remains the planned Phase 6 implementation in `todo.md`; this remediation does not deliver that phase. Large installations may need pagination and smaller administrative batches; current limits are documented in `CLAUDE.md`.
+
+## Onboarding and site administration deployment — 7 October 2026
+
+The live site was still serving an older bundle that sent signed-in accounts
+without membership to organization setup. Deployed the validated current web
+build and eight coordinated callables: `registerSubscription`, `joinSubscription`,
+`getMySubscriptionRequest`, `listSubscriptionRequests`, `reviewSubscriptionRequest`,
+`listSiteSubscriptions`, `getSiteSubscription`, and `updateSiteSubscription`.
+
+Default sign-in now leads accounts without subscription membership to the
+invitation-required message, without a registration option. Explicit `/register`
+submissions require a description and site-administrator approval before tenant
+creation. Site administrators review requests in `/site-admin`.
+
+Validation: web/backend builds and lint passed (existing web bundle-size and
+Fast Refresh warnings remain); prior emulator regression covered 64 cases, and
+16 browser fixture checks covered desktop/mobile application and review flows.
+The production `getMySubscriptionRequest`, `listSubscriptionRequests` and
+`listSiteSubscriptions` endpoints reject unauthenticated requests with HTTP 401.
+Verified both `www.atver.lv` and the Firebase Hosting domain serve the new bundle
+with the invitation route/message, approval callables, and no old setup screen.
+These release checks do not simulate a fresh production Google sign-in.

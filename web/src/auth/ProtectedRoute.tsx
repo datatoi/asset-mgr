@@ -15,9 +15,9 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If user is logged in but has no subscription data, redirect to registration
-  if (!userData?.subscriptionId && location.pathname !== '/register') {
-    return <Navigate to="/register" replace />;
+  // Membership comes from an invitation; registration is an explicit owner flow.
+  if (!userData?.subscriptionId && location.pathname !== '/invitation-required') {
+    return <Navigate to="/invitation-required" replace />;
   }
 
   // A 'joiner' (default role from the invite-link join flow, before an

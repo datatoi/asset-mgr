@@ -16,6 +16,9 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { useAuth } from './auth/AuthContext';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
+import InvitationRequiredPage from './pages/InvitationRequiredPage';
+import SiteAdminPage from './pages/SiteAdminPage';
+import AdministrationPage from './pages/AdministrationPage';
 import RegisterPage from './pages/RegisterPage';
 import JoinPage from './pages/JoinPage';
 import ItemsPage from './pages/ItemsPage';
@@ -31,7 +34,7 @@ import GroupsPage from './pages/GroupsPage';
 const { Header, Content, Sider } = Layout;
 
 const DesktopApp: React.FC = () => {
-  const { userData, isOwner, logout } = useAuth();
+  const { user, userData, isOwner, isSiteAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -52,12 +55,15 @@ const DesktopApp: React.FC = () => {
     { key: '/products', icon: <TagsOutlined />, label: 'Products' },
     { key: '/kits', icon: <InboxOutlined />, label: 'Kits' },
     { key: '/transfers', icon: <InboxOutlined />, label: 'Transfers' },
+    ...(isAdmin ? [{ key: '/administration', icon: <TeamOutlined />, label: 'Administration' }] : []),
     ...(isAdmin ? [{ key: '/members', icon: <UserOutlined />, label: 'Members' }] : []),
     ...(isAdmin ? [{ key: '/groups', icon: <TeamOutlined />, label: 'Groups' }] : []),
     { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
   ];
 
-  const showSider = !['/login', '/register'].includes(location.pathname) && !location.pathname.startsWith('/join/');
+  if (isSiteAdmin) menuItems.push({ key: '/site-admin', icon: <TeamOutlined />, label: 'Site administration' });
+
+  const showSider = !!user && !!userData?.subscriptionId && !['/login', '/register', '/invitation-required'].includes(location.pathname) && !location.pathname.startsWith('/join/');
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -96,6 +102,9 @@ const DesktopApp: React.FC = () => {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<RegisterPage />} />
+          <Route path="/invitation-required" element={<InvitationRequiredPage />} />
+          <Route path="/site-admin" element={<SiteAdminPage />} />
+          <Route path="/administration" element={<ProtectedRoute><AdministrationPage /></ProtectedRoute>} />
             <Route path="/join/:subscriptionId" element={<JoinPage />} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/items" element={<ProtectedRoute><ItemsPage /></ProtectedRoute>} />

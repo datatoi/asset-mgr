@@ -17,6 +17,9 @@ import ProductsPage from '../pages/ProductsPage';
 import MembersPage from '../pages/MembersPage';
 import GroupsPage from '../pages/GroupsPage';
 import Login from '../pages/Login';
+import InvitationRequiredPage from '../pages/InvitationRequiredPage';
+import SiteAdminPage from '../pages/SiteAdminPage';
+import AdministrationPage from '../pages/AdministrationPage';
 import RegisterPage from '../pages/RegisterPage';
 import JoinPage from '../pages/JoinPage';
 import './mobile.css';
@@ -24,15 +27,15 @@ import './mobile.css';
 const titles: Record<string, string> = {
   '/': 'My items', '/dashboard': 'My items', '/items': 'Inventory', '/kits': 'Kits',
   '/transfers': 'Transfers', '/profile': 'Profile', '/categories': 'Categories',
-  '/products': 'Products', '/members': 'Members', '/groups': 'Groups', '/manage/items': 'Manage items', '/manage/kits': 'Manage kits',
+  '/site-admin': 'Site administration', '/administration': 'Administration', '/products': 'Products', '/members': 'Members', '/groups': 'Groups', '/manage/items': 'Manage items', '/manage/kits': 'Manage kits',
 };
 
 export default function MobileApp() {
-  const { user, userData, isOwner, logout } = useAuth();
+  const { user, userData, isOwner, isSiteAdmin, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [more, setMore] = useState(false);
-  const publicPage = ['/login', '/register'].includes(location.pathname) || location.pathname.startsWith('/join/');
+  const publicPage = !userData?.subscriptionId || ['/login', '/register', '/invitation-required'].includes(location.pathname) || location.pathname.startsWith('/join/');
   const profileOnly = !isOwner && !Object.values(userData?.groups || {}).some(r => ['user', 'admin', 'superadmin'].includes(r));
   const admin = canManage(userData, undefined, isOwner);
   const detail = location.pathname.startsWith('/items/');
@@ -49,8 +52,9 @@ export default function MobileApp() {
     { path: '/items', label: 'Browse inventory' },
     { path: '/categories', label: 'Categories' },
     { path: '/products', label: 'Products' },
-    ...(admin ? [{ path: '/manage/items', label: 'Manage items' }, { path: '/manage/kits', label: 'Manage kits' }, { path: '/members', label: 'Members' }, { path: '/groups', label: 'Groups' }] : []),
+    ...(admin ? [{ path: '/administration', label: 'Administration' }, { path: '/manage/items', label: 'Manage items' }, { path: '/manage/kits', label: 'Manage kits' }, { path: '/members', label: 'Members' }, { path: '/groups', label: 'Groups' }] : []),
   ];
+  if (isSiteAdmin) links.push({ path: '/site-admin', label: 'Site administration' });
   return <ConfigProvider componentSize="large" theme={{ token: { controlHeightLG: 48, borderRadius: 12 } }}>
     <div className={`mobile-app${publicPage ? ' mobile-public' : ''}`}>
       {!publicPage && user && <header className="mobile-header">
@@ -62,6 +66,9 @@ export default function MobileApp() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/invitation-required" element={<InvitationRequiredPage />} />
+          <Route path="/site-admin" element={<SiteAdminPage />} />
+          <Route path="/administration" element={<ProtectedRoute><AdministrationPage /></ProtectedRoute>} />
           <Route path="/join/:subscriptionId" element={<JoinPage />} />
           <Route path="/" element={<ProtectedRoute><MobileInventory key="my-items" /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><MobileInventory key="my-items" /></ProtectedRoute>} />

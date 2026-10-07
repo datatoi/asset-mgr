@@ -2,24 +2,24 @@ import React from 'react';
 import { Button, Card, Typography, Layout, Space } from 'antd';
 import { GoogleOutlined } from '@ant-design/icons';
 import { useAuth } from '../auth/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 const { Content } = Layout;
 
 const LoginPage: React.FC = () => {
-  const { login, user, userData, loading } = useAuth();
+  const { login, user, userData, loading, isSiteAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = location.state?.from?.pathname;
 
   React.useEffect(() => {
     if (!loading && user) {
-      if (userData?.subscriptionId) {
-        navigate('/dashboard');
-      } else {
-        navigate('/register');
-      }
+      const returnPath = typeof destination === 'string' && destination.startsWith('/') && !destination.startsWith('//') && destination !== '/login'
+        ? destination : '/dashboard';
+      navigate(isSiteAdmin && (!destination || destination === '/site-admin') ? '/site-admin' : userData?.subscriptionId ? returnPath : '/invitation-required', { replace: true });
     }
-  }, [user, userData, loading, navigate]);
+  }, [user, userData, loading, navigate, destination, isSiteAdmin]);
 
   return (
     <Layout style={{ minHeight: '100vh', justifyContent: 'center', alignItems: 'center', background: '#f0f2f5' }}>

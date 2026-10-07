@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   type User,
-  onAuthStateChanged,
+  onIdTokenChanged,
+  getIdTokenResult,
   signInWithPopup,
   GoogleAuthProvider,
   signOut
@@ -15,6 +16,7 @@ interface AuthContextType {
   userData: UserProfile | null;
   loading: boolean;
   isOwner: boolean;
+  isSiteAdmin: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -26,12 +28,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userData, setUserData] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
+  const [isSiteAdmin, setIsSiteAdmin] = useState(false);
+  const [claimsLoading, setClaimsLoading] = useState(true);
 
   useEffect(() => {
     let stopProfile: (() => void) | undefined;
     let stopSubscription: (() => void) | undefined;
     let generation = 0;
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
+    const unsubAuth = onIdTokenChanged(auth, (u) => {
       const current = ++generation;
       stopProfile?.();
       stopSubscription?.();
@@ -41,6 +45,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUserData(null);
       setIsOwner(false);
       setLoading(!!u);
+      setIsSiteAdmin(false);
+      setClaimsLoading(!!u);
+      if (u) void getIdTokenResult(u).then(result => {
+        if (generation === current) setIsSiteAdmin(result.claims.siteAdmin === true);
+      }).catch(() => {
+        if (generation === current) setIsSiteAdmin(false);
+      }).finally(() => {
+        if (generation === current) setClaimsLoading(false);
+      });
       if (!u) return;
       let subscriptionId: string | undefined;
       stopProfile = onSnapshot(doc(db, 'users', u.uid), (snap) => {
@@ -93,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, isOwner, login, logout }}>
+    <AuthContext.Provider value={{ user, userData, loading: loading || claimsLoading, isOwner, isSiteAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

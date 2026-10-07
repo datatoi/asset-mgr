@@ -14,9 +14,9 @@ so the core mechanic is **availability + checkout/booking** of kits and items, w
 
 **Open source, self-hosted**: each deployer runs their own Firebase project
 (see [docs/installation.md](docs/installation.md)). There is no hosted
-multi-tenant SaaS and no site-wide operator role — whoever deploys the
-project already has full Firebase Console/`gcloud` access to their own
-instance, so there's nothing a separate in-app "platform admin" would add.
+multi-tenant SaaS. Deployers retain Firebase Console/`gcloud` access, and can
+optionally grant a site administrator access to the in-app subscription directory
+at `/site-admin` using a Firebase Auth custom claim (`siteAdmin: true`).
 Multi-tenancy (Subscriptions/Groups, see below) exists so one deployed
 instance can serve more than one organization if desired, not to support a
 hosted-SaaS billing/operator model.
@@ -62,8 +62,17 @@ hosted-SaaS billing/operator model.
 - Hosting: Firebase Hosting
 
 ## Tenancy & roles
-- **Subscription** is the top-level tenant. A sub-owner registers (Google login) and
-  a new Subscription is created for them. The Subscription **owns many Groups**.
+
+See [ARCHITECTURE.md — User roles and authorization](ARCHITECTURE.md#user-roles-and-authorization)
+for the role/permission table, authority scopes, onboarding states and enforcement
+implementation. Site administrators use an independently provisioned Auth claim;
+subscription owners use `ownerUserId`; group roles use the user’s `groups` map.
+
+- **Subscription** is the top-level tenant. An applicant signs in at `/register`
+  and submits an organization name, first group name and required explanation.
+  Only site-admin approval creates their Subscription, first Group and owner
+  membership. The Subscription **owns many Groups**. Existing subscriptions remain
+  active; this approval requirement applies to new registration requests.
 - Roles are **per-group**, stored in the user's `groups` map: `superadmin` |
   `admin` | `user` | `joiner`. The subscription owner is the highest authority
   for their sub. `joiner` is the default role granted by the invite-link join
@@ -87,6 +96,13 @@ hosted-SaaS billing/operator model.
 
 Catalog hierarchy: **Category → Product → Item**, plus **Kit** (outfit definition used to group inventory).
 
+- `subscriptionRequests/{uid}` — latest application for an Auth UID: `requesterId`,
+  `requesterName`, `requesterEmail`, `orgName`, `groupName`, `description`,
+  `revision`, `status` (`pending`|`approved`|`declined`|`cancelled`), `requestedAt`,
+  `reviewedAt?`, `reviewedByUserId?`, `reviewReason?`, `subscriptionId?`. This is
+  pre-tenant data, accessible only through applicant/site-admin callables; direct
+  Firestore reads/writes are denied. Decisions and reviewed explanations are
+  preserved in `siteAdminHistory`. One pending request per account.
 - `subscriptions/{subId}` — `ownerUserId`, `name`, `createdAt`
 - `groups/{groupId}` — `subscriptionId`, `name`, `description`, `createdAt`,
   `subscriptionOwnerId?` (server-derived owner mirror for Storage authorization)
@@ -143,9 +159,28 @@ Kit fulfillment and dashboards filter on `holderId == "storage"` to find
 available items.
 
 ## Key workflows
-- **Onboarding**: Google login → create Subscription (owner) → create Group(s) →
-  build catalog (categories → products → items, with photos + NFC tags) → invite members.
-- **Groups**: registration creates the first group. Owners/superadmins use
+- **Onboarding**: default sign-in requires existing subscription membership. Signed-in
+  users without membership see `/invitation-required`, which explains how to obtain
+  an invitation, with no registration link or mention of creating a subscription.
+  Applicants explicitly use `/register` to submit a request and explanation via
+  `registerSubscription`. `/register` displays their request through
+  `getMySubscriptionRequest`: pending, declined with feedback and revision/resubmit,
+  or approved with an Open my organization action. No tenant or membership exists
+  before approval. See [docs/subscription-onboarding-ux.md](docs/subscription-onboarding-ux.md). `/administration` is
+  an organization-scoped management hub for owners/admins/superadmins, linking to
+  catalog/member/group forms and the invitation link. `/site-admin` is a separate
+  site-wide page, available even without tenant membership. It lists subscriptions,
+  shows bounded group/member summaries, and renames subscriptions with an audit
+  entry in `siteAdminHistory`. Its default Subscription requests tab loads
+  `listSubscriptionRequests` by status and allows `reviewSubscriptionRequest`:
+  approval atomically creates the tenant/group/owner membership; decline requires
+  feedback. Decisions validate the pending request revision, preventing stale or
+  repeated approval. Invite joining closes any pending application in the same
+  transaction, so concurrent approval/join cannot mix tenants. Site authority is provisioned through trusted Admin
+  SDK credentials (`scripts/site-admin.cjs`), checked against the live Auth user by
+  each callable, and never inferred from tenant roles. It does not bypass tenant
+  permissions in existing catalog, transfer or role callables.
+- **Groups**: registration approval creates the first group. Owners/superadmins use
   `createGroup`, `updateGroup`, and `deleteGroup`; only empty groups can be deleted,
   at least one group must remain, and membership-map entries are removed atomically.
   Catalog forms require an authorized group. Existing group assignments are
@@ -213,7 +248,8 @@ available items.
 - **`users.subscriptionId`/`groups` can never be set by a direct client
   write** — blocked on both `create` and `update` in `firestore.rules`.
   Joining a subscription (registration or invite link) always goes through
-  `registerSubscription`/`joinSubscription` (Admin SDK, bypasses rules).
+  `reviewSubscriptionRequest` (site-admin approval) or `joinSubscription`
+  (Admin SDK, bypasses rules); `registerSubscription` only submits an application.
 
 ## Status
 Core web app scaffolded and functional (Firebase project, auth, subscription

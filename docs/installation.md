@@ -181,11 +181,48 @@ Your app is now live at `https://YOUR-PROJECT-ID.web.app`.
 
 ## 12. First run — register an organization
 
-Sign in and go through `/register` to create the first Subscription, Group,
-and owner — this makes you `superadmin` of that group. There's no separate
-site-wide admin role: whoever deploys this instance already has full
-Console/`gcloud` access to it. See [../CLAUDE.md](../CLAUDE.md) for how
-registration and roles work.
+Open `/register` explicitly to sign in and request a new Subscription. Enter the
+organization name, first group name and a required explanation of why it needs
+a subscription. A site administrator must approve the request before the
+Subscription, Group and owner membership are created. Default sign-in sends
+accounts without membership to an invitation message, with no registration
+promotion; share `/join/{subscriptionId}` with members from Administration.
+
+Site administration is available at `/site-admin`: the default Subscription
+requests tab contains the approval queue and reviewed requests. Administrators
+review the explanation, confirm approval, or decline with feedback. The
+Subscriptions tab lists all subscriptions, shows group/member summaries (up to
+100 members), and permits subscription renaming. Tenant administration remains at `/administration`.
+
+To grant site access, first have the intended administrator sign in once, then
+copy their UID from Firebase Authentication. Use trusted credentials for the
+explicit target project (Application Default Credentials, for example via
+`gcloud auth application-default login` followed by
+`gcloud auth application-default set-quota-project YOUR-PROJECT-ID`):
+
+```bash
+node scripts/site-admin.cjs YOUR-PROJECT-ID AUTH-UID grant
+# Remove site access:
+node scripts/site-admin.cjs YOUR-PROJECT-ID AUTH-UID revoke
+```
+
+The script preserves other custom claims. Sign out and back in after granting
+access so navigation refreshes. Revocation is enforced immediately by the site
+callables reading the live Auth user's claims. Subscription ownership and group
+roles cannot grant site access. Site administrators do not gain automatic
+catalog, transfer or role-management authority across tenants; these operations
+retain their existing authorization. Rename and application-review audit entries are stored in `siteAdminHistory`
+and accessible through the Firebase Console only. Applicants see their latest
+request status and decline feedback at `/register`; they can revise and resubmit
+a declined request. Joining an existing organization cancels a pending request.
+Provision at least one site administrator before accepting registration requests
+(including the first organization). The administrator can sign in without tenant
+membership, so there is no bootstrap dependency. Existing subscriptions do not
+require retroactive approval. Deploy the new site callables and updated
+`registerSubscription` together with the web app; the older immediate-creation
+registration client is incompatible with this approval flow. Firestore rules
+remain unchanged: request reads/reviews are callable-only. See
+[../CLAUDE.md](../CLAUDE.md) for the full authorization model.
 
 ## Troubleshooting
 

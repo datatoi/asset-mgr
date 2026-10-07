@@ -46,6 +46,9 @@ async function client(name, signedIn = true) {
   const other = await client('other');
   const foreign = await client('foreign');
   const anonymous = await client('anonymous', false);
+  const operator = await client('operator');
+  const authAdmin = fr('firebase-admin/auth').getAuth();
+  await authAdmin.setCustomUserClaims(operator.uid, { siteAdmin: true });
   const A = 'subA'; const G = 'groupA';
   await db.doc(`subscriptions/${A}`).set({ ownerUserId: owner.uid, name: 'A' });
   await db.doc('subscriptions/subB').set({ ownerUserId: foreign.uid, name: 'B' });
@@ -61,6 +64,48 @@ async function client(name, signedIn = true) {
   const product = await call('saveCatalog', owner.uid, { collection: 'products', values: { groupId: G, categoryId: 'categoryA', name: 'Shared shirt', gender: 'unisex' } });
   const newItem = async () => (await call('saveCatalog', owner.uid, { collection: 'items', values: { groupId: G, productId: product.id, size: 'M', gender: 'unisex', condition: 'good' } })).id;
   const itemId = await newItem();
+  await test('Site administration rejects unauthenticated callers and tenant admins', async () => {
+    for (const fn of ['listSiteSubscriptions', 'getSiteSubscription', 'updateSiteSubscription']) {
+      const data = fn === 'listSiteSubscriptions' ? {} : { subscriptionId: A, ...(fn === 'updateSiteSubscription' ? { name: 'Changed' } : {}) };
+      await denied(() => api[fn].run({ data }), 'unauthenticated');
+      for (const c of [owner, manager, user, foreign]) await denied(() => call(fn, c.uid, data));
+    }
+  });
+  await test('Site operators without membership can inspect and rename any subscription', async () => {
+    const list = await call('listSiteSubscriptions', operator.uid, {});
+    assert.deepEqual(list.subscriptions.map(s => s.id), ['subA', 'subB']);
+    const detail = await call('getSiteSubscription', operator.uid, { subscriptionId: A });
+    assert.equal(detail.memberCount, 4);
+    assert.equal(detail.groups.length, 2);
+    await call('updateSiteSubscription', operator.uid, { subscriptionId: 'subB', name: 'Renamed B' });
+    assert.equal((await db.doc('subscriptions/subB').get()).data().name, 'Renamed B');
+    const history = await db.collection('siteAdminHistory').get();
+    assert.equal(history.size, 1);
+    assert.equal(history.docs[0].data().initiatedByUserId, operator.uid);
+    assert.equal((await db.doc(`users/${operator.uid}`).get()).exists, false);
+    await denied(() => call('transferItem', operator.uid, { itemId, newHolderId: user.uid }), 'not-found');
+  });
+  await test('Site administration validates schemas and handles missing subscriptions', async () => {
+    for (const data of [{ subscriptionId: A, name: '' }, { subscriptionId: A, name: 'x'.repeat(201) }, { subscriptionId: '../bad', name: 'Bad' }, { subscriptionId: A, name: 'Bad', ownerUserId: operator.uid }]) {
+      await denied(() => call('updateSiteSubscription', operator.uid, data), 'invalid-argument');
+    }
+    await denied(() => call('getSiteSubscription', operator.uid, { subscriptionId: 'missing' }), 'not-found');
+    await denied(() => call('updateSiteSubscription', operator.uid, { subscriptionId: 'missing', name: 'Missing' }), 'not-found');
+  });
+  await test('Site directory paginates without duplicates or omissions', async () => {
+    for (let n = 0; n < 26; n++) await db.doc(`subscriptions/page-${String(n).padStart(2, '0')}`).set({ name: `Page ${n}`, ownerUserId: owner.uid });
+    const first = await call('listSiteSubscriptions', operator.uid, {});
+    const second = await call('listSiteSubscriptions', operator.uid, { after: first.nextCursor });
+    assert.equal(first.subscriptions.length, 25);
+    assert.equal(second.subscriptions.length, 3);
+    assert.equal(second.nextCursor, null);
+    assert.equal(new Set([...first.subscriptions, ...second.subscriptions].map(s => s.id)).size, 28);
+  });
+  await test('Revoked site claims reject even an old claimed token', async () => {
+    await authAdmin.setCustomUserClaims(operator.uid, {});
+    await denied(() => api.listSiteSubscriptions.run({ auth: { uid: operator.uid, token: { siteAdmin: true } }, data: {} }));
+    await authAdmin.setCustomUserClaims(operator.uid, { siteAdmin: true });
+  });
   await test('Bulk requests bind exact items and current holders', async () => {
     const a = await newItem(); const b = await newItem();
     await call('transferItem', owner.uid, { itemId: b, newHolderId: other.uid });
@@ -201,13 +246,91 @@ async function client(name, signedIn = true) {
     await call('updateProfile', user.uid, { avatarUrl: 'https://example.org/avatar.png' });
     assert.equal((await sdk.getDoc(sdk.doc(user.store, 'users', user.uid))).data().avatarUrl, 'https://example.org/avatar.png');
   });
-  await test('Concurrent onboarding creates one organization', async () => {
+  const applicationValues = { orgName: 'New ensemble', groupName: 'Main', description: 'We manage shared costumes for our dancers.' };
+  const apply = uid => call('registerSubscription', uid, applicationValues);
+  const review = (uid, revision = 1, decision = 'approved', reason) => call('reviewSubscriptionRequest', operator.uid, { requesterId: uid, revision, decision, ...(reason === undefined ? {} : { reason }) });
+  await test('Concurrent registration creates only one pending request and no tenant', async () => {
     const uid = 'concurrent-new-user';
-    const outcomes = await Promise.allSettled([call('registerSubscription', uid, { orgName: 'One', groupName: 'One' }), call('registerSubscription', uid, { orgName: 'Two', groupName: 'Two' })]);
+    const outcomes = await Promise.allSettled([apply(uid), apply(uid)]);
     assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
-    const memberships = (await db.doc(`users/${uid}`).get()).data();
-    assert.equal(Object.keys(memberships.groups).length, 1);
+    assert.equal((await db.doc(`users/${uid}`).get()).exists, false);
+    assert.equal((await db.collection('subscriptions').where('ownerUserId', '==', uid).get()).size, 0);
+    assert.equal((await call('getMySubscriptionRequest', uid, {})).application.status, 'pending');
+  });
+  await test('Registration requires a bounded explanation and rejects authority injection', async () => {
+    for (const extra of [{ description: undefined }, { description: ' ' }, { description: 'x'.repeat(2001) }, { status: 'approved' }, { requesterId: owner.uid }, { subscriptionId: A }]) {
+      await denied(() => call('registerSubscription', 'invalid-applicant', { ...applicationValues, ...extra }), 'invalid-argument');
+    }
+    await denied(() => apply(owner.uid), 'already-exists');
+  });
+  await test('Applicants cannot browse, review, read another application or write request documents', async () => {
+    await apply('private-applicant');
+    assert.equal((await call('getMySubscriptionRequest', 'unrelated-applicant', {})).application, null);
+    await denied(() => call('getMySubscriptionRequest', user.uid, { requesterId: 'private-applicant' }), 'invalid-argument');
+    for (const c of [user, manager, owner]) {
+      await denied(() => call('listSubscriptionRequests', c.uid, { status: 'pending' }));
+      await denied(() => call('reviewSubscriptionRequest', c.uid, { requesterId: 'private-applicant', revision: 1, decision: 'approved' }));
+    }
+    await denied(() => sdk.getDoc(sdk.doc(user.store, 'subscriptionRequests', 'private-applicant')));
+    await denied(() => sdk.setDoc(sdk.doc(user.store, 'subscriptionRequests', user.uid), { status: 'approved' }));
+    await denied(() => api.getMySubscriptionRequest.run({ data: {} }), 'unauthenticated');
+  });
+  await test('Pending applicants cannot create groups or use an organization', async () => {
+    const uid = 'pending-no-access'; await apply(uid);
+    await denied(() => call('createGroup', uid, { name: 'Bypass' }), 'not-found');
+    await denied(() => call('saveCatalog', uid, { collection: 'categories', values: { groupId: G, name: 'Bypass', gender: 'unisex' } }), 'not-found');
+  });
+  await test('Approval creates subscription, first group and owner access atomically', async () => {
+    const uid = 'approved-applicant'; await apply(uid);
+    const result = await review(uid);
+    const member = (await db.doc(`users/${uid}`).get()).data();
+    const sub = (await db.doc(`subscriptions/${result.subscriptionId}`).get()).data();
+    assert.equal(sub.ownerUserId, uid); assert.equal(sub.name, applicationValues.orgName);
+    assert.equal(member.subscriptionId, result.subscriptionId);
+    const [groupId] = Object.keys(member.groups);
+    assert.equal(member.groups[groupId], 'superadmin');
+    assert.equal((await db.doc(`groups/${groupId}`).get()).data().subscriptionId, result.subscriptionId);
+    assert.equal((await call('getMySubscriptionRequest', uid, {})).application.status, 'approved');
+    await call('createGroup', uid, { name: 'Second group' });
+    await denied(() => review(uid), 'failed-precondition');
+  });
+  await test('Concurrent conflicting reviews produce exactly one decision', async () => {
+    const uid = 'review-race'; await apply(uid);
+    const outcomes = await Promise.allSettled([review(uid), review(uid, 1, 'declined', 'Please provide more detail.')]);
+    assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
+    const application = (await db.doc(`subscriptionRequests/${uid}`).get()).data();
+    const subs = await db.collection('subscriptions').where('ownerUserId', '==', uid).get();
+    assert.equal(subs.size, application.status === 'approved' ? 1 : 0);
+    const audit = await db.collection('siteAdminHistory').where('requesterId', '==', uid).get();
+    assert.equal(audit.size, 1);
+  });
+  await test('Declining requires feedback; resubmission invalidates stale reviews', async () => {
+    const uid = 'declined-applicant'; await apply(uid);
+    for (const reason of [undefined, '', ' ', 'x'.repeat(2001)]) await denied(() => review(uid, 1, 'declined', reason), 'invalid-argument');
+    await review(uid, 1, 'declined', 'Explain which costumes you manage.');
+    assert.equal((await call('getMySubscriptionRequest', uid, {})).application.reviewReason, 'Explain which costumes you manage.');
+    assert.equal((await db.doc(`users/${uid}`).get()).exists, false);
+    const resubmitted = await apply(uid); assert.equal(resubmitted.revision, 2);
+    await denied(() => review(uid, 1), 'failed-precondition');
+    await review(uid, 2);
     assert.equal((await db.collection('subscriptions').where('ownerUserId', '==', uid).get()).size, 1);
+  });
+  await test('Site review validates payloads and missing requests', async () => {
+    for (const values of [{ revision: 0 }, { revision: '1' }, { decision: 'pending' }, { decision: 'approved', reason: 'unexpected' }, { ownerUserId: operator.uid }]) {
+      await denied(() => call('reviewSubscriptionRequest', operator.uid, { requesterId: 'private-applicant', revision: 1, decision: 'approved', ...values }), 'invalid-argument');
+    }
+    await denied(() => review('missing-applicant'), 'not-found');
+  });
+  await test('Site request queue paginates and filters decisions', async () => {
+    for (let n = 0; n < 26; n++) await apply(`queue-${String(n).padStart(2, '0')}`);
+    const first = await call('listSubscriptionRequests', operator.uid, { status: 'pending' });
+    const second = await call('listSubscriptionRequests', operator.uid, { status: 'pending', after: first.nextCursor });
+    assert.equal(first.applications.length, 25);
+    const all = [...first.applications, ...second.applications];
+    assert.equal(new Set(all.map(row => row.requesterId)).size, all.length);
+    assert(all.every(row => row.status === 'pending'));
+    const approved = await call('listSubscriptionRequests', operator.uid, { status: 'approved' });
+    assert(approved.applications.some(row => row.requesterId === 'approved-applicant'));
   });
   await test('Referenced catalog records cannot be deleted', () => denied(() => call('deleteCatalog', owner.uid, { collection: 'products', id: product.id }), 'failed-precondition'));
   await test('Direct legacy transfers are rejected', async () => {
@@ -244,15 +367,22 @@ async function client(name, signedIn = true) {
     await call('assignRole', owner.uid, { targetUid: owner.uid, groupId: G, role: 'superadmin' });
     await call('assignRole', owner.uid, { targetUid: user.uid, groupId: G, role: 'user' });
   });
-  await test('Concurrent registration and invitation joining cannot mix tenants', async () => {
+  await test('Joining an invitation closes a pending subscription request', async () => {
     const uid = 'register-join-race';
-    const outcomes = await Promise.allSettled([
-      call('registerSubscription', uid, { orgName: 'Race', groupName: 'Race' }),
-      call('joinSubscription', uid, { subscriptionId: A }),
-    ]);
+    await apply(uid);
+    await call('joinSubscription', uid, { subscriptionId: A });
+    assert.equal((await call('getMySubscriptionRequest', uid, {})).application.status, 'cancelled');
+    await denied(() => review(uid), 'failed-precondition');
+    assert.equal((await db.doc(`users/${uid}`).get()).data().subscriptionId, A);
+  });
+  await test('Concurrent approval and invitation joining cannot mix tenants', async () => {
+    const uid = 'approve-join-race'; await apply(uid);
+    const outcomes = await Promise.allSettled([review(uid), call('joinSubscription', uid, { subscriptionId: A })]);
     assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
     const u = (await db.doc(`users/${uid}`).get()).data();
     for (const groupId of Object.keys(u.groups)) assert.equal((await db.doc(`groups/${groupId}`).get()).data().subscriptionId, u.subscriptionId);
+    const application = (await call('getMySubscriptionRequest', uid, {})).application;
+    assert.equal(application.status, u.subscriptionId === A ? 'cancelled' : 'approved');
   });
   await test('Unavailable kit product creates no partial requests', async () => {
     const missing = await call('saveCatalog', owner.uid, { collection: 'products', values: { groupId: G, categoryId: 'categoryA', name: 'Missing garment', gender: 'male' } });

@@ -1,12 +1,14 @@
 import {setGlobalOptions} from "firebase-functions/v2";
 import {onCall, HttpsError, CallableRequest} from "firebase-functions/v2/https";
 import {initializeApp} from "firebase-admin/app";
+import {getAuth} from "firebase-admin/auth";
 import {
   getFirestore,
   FieldValue,
   DocumentData,
   Transaction,
   Query,
+  FieldPath,
 } from "firebase-admin/firestore";
 
 initializeApp();
@@ -18,6 +20,89 @@ const now = () => FieldValue.serverTimestamp();
 const roles = ["joiner", "user", "admin", "superadmin"];
 const activeRoles = ["user", "admin", "superadmin"];
 const catalogs = ["categories", "products", "items", "kits"];
+
+/**
+ * Site authority is provisioned by the deployer, outside tenant role maps.
+ * Re-read Auth so revocation takes effect even with an old ID token.
+ * @param {CallableRequest} request Callable context.
+ * @return {Promise<string>} Site administrator UID.
+ */
+async function siteAdmin(request: CallableRequest): Promise<string> {
+  const uid = caller(request);
+  const user = await getAuth().getUser(uid);
+  if (user.disabled || user.customClaims?.siteAdmin !== true) {
+    throw new HttpsError(
+      "permission-denied", "Site administrator access required."
+    );
+  }
+  return uid;
+}
+
+/** Paginated site-wide subscription directory. */
+export const listSiteSubscriptions = onCall(async (request) => {
+  await siteAdmin(request);
+  fields(request.data, ["after"]);
+  let query = db.collection("subscriptions")
+    .orderBy(FieldPath.documentId()).limit(26);
+  if (request.data.after !== undefined) {
+    query = query.startAfter(id(request.data.after, "after"));
+  }
+  const result = await query.get();
+  const rows = result.docs.slice(0, 25);
+  return {
+    subscriptions: rows.map((doc) => ({
+      id: doc.id,
+      name: doc.data().name,
+      ownerUserId: doc.data().ownerUserId,
+      createdAt: doc.data().createdAt?.toDate().toISOString() || null,
+    })),
+    nextCursor: result.size > 25 ? rows[24].id : null,
+  };
+});
+
+/** Bounded subscription summary for site operators. */
+export const getSiteSubscription = onCall(async (request) => {
+  await siteAdmin(request);
+  fields(request.data, ["subscriptionId"]);
+  const subId = id(request.data.subscriptionId, "subscriptionId");
+  const sub = await db.doc(`subscriptions/${subId}`).get();
+  if (!sub.exists) throw new HttpsError("not-found", "Subscription not found.");
+  const [groups, members, memberCount] = await Promise.all([
+    db.collection("groups").where("subscriptionId", "==", subId)
+      .limit(100).get(),
+    db.collection("users").where("subscriptionId", "==", subId)
+      .limit(100).get(),
+    db.collection("users").where("subscriptionId", "==", subId).count().get(),
+  ]);
+  return {
+    id: subId,
+    name: sub.data()?.name,
+    ownerUserId: sub.data()?.ownerUserId,
+    groups: groups.docs.map((doc) => ({id: doc.id, name: doc.data().name})),
+    members: members.docs.map((doc) => ({
+      id: doc.id, name: doc.data().name || "", email: doc.data().email || "",
+      groups: doc.data().groups || {},
+    })),
+    memberCount: memberCount.data().count,
+  };
+});
+
+/** Audited subscription renaming by a site operator. */
+export const updateSiteSubscription = onCall(async (request) => {
+  const uid = await siteAdmin(request);
+  fields(request.data, ["subscriptionId", "name"]);
+  const subId = id(request.data.subscriptionId, "subscriptionId");
+  const name = text(request.data.name, "name");
+  await db.runTransaction(async (tx) => {
+    await read(tx, `subscriptions/${subId}`);
+    tx.update(db.doc(`subscriptions/${subId}`), {name});
+    tx.create(db.collection("siteAdminHistory").doc(), {
+      subscriptionId: subId, initiatedByUserId: uid,
+      action: "rename-subscription", name, timestamp: now(),
+    });
+  });
+  return {success: true};
+});
 
 /**
  * Validate object payloads before reading any fields.
@@ -199,41 +284,158 @@ async function itemScope(tx: Transaction, uid: string, itemId: string) {
   return {...access, item};
 }
 
-/** Concurrent registration and joining contend on the same user document. */
+/** Registration submits an application, without creating tenant access. */
 export const registerSubscription = onCall(async (request) => {
   const uid = caller(request);
-  fields(request.data, ["orgName", "groupName"]);
-  const name = text(request.data.orgName, "organization name");
+  fields(request.data, ["orgName", "groupName", "description"]);
+  const orgName = text(request.data.orgName, "organization name");
   const groupName = text(request.data.groupName, "group name");
-  const userRef = db.doc(`users/${uid}`);
-  const subRef = db.collection("subscriptions").doc();
-  const groupRef = db.collection("groups").doc();
-  await db.runTransaction(async (tx) => {
-    const existing = (await tx.get(userRef)).data();
-    if (existing?.subscriptionId) {
+  const description = text(
+    request.data.description, "request description", 2000
+  );
+  const requestRef = db.doc(`subscriptionRequests/${uid}`);
+  return db.runTransaction(async (tx) => {
+    const [user, previous] = await Promise.all([
+      tx.get(db.doc(`users/${uid}`)), tx.get(requestRef),
+    ]);
+    if (user.data()?.subscriptionId) {
       throw new HttpsError(
-        "already-exists",
-        "You already belong to an organization."
+        "already-exists", "You already belong to an organization."
       );
     }
-    tx.create(subRef, {name, ownerUserId: uid, createdAt: now()});
-    tx.create(groupRef, {
-      subscriptionId: subRef.id,
-      name: groupName,
-      description: "",
-      createdAt: now(),
+    if (previous.data()?.status === "pending") {
+      throw new HttpsError(
+        "already-exists", "Your request is already awaiting review."
+      );
+    }
+    const revision = (previous.data()?.revision || 0) + 1;
+    tx.set(requestRef, {
+      requesterId: uid, requesterName: request.auth?.token.name || "Member",
+      requesterEmail: request.auth?.token.email || "",
+      orgName, groupName, description, revision,
+      status: "pending", requestedAt: now(),
     });
-    tx.set(userRef, {
-      name: existing?.name || request.auth?.token.name || "Member",
-      email: request.auth?.token.email || "",
-      avatarUrl: existing?.avatarUrl || request.auth?.token.picture || null,
-      subscriptionId: subRef.id,
-      groups: {[groupRef.id]: "superadmin"},
-      sizes: {},
-      createdAt: existing?.createdAt || now(),
-    });
+    return {requestId: uid, status: "pending", revision};
   });
-  return {subscriptionId: subRef.id, groupId: groupRef.id};
+});
+
+/**
+ * Serialize only the documented application fields for callable responses.
+ * @param {Data} data Application document.
+ * @return {Data} Public application summary.
+ */
+function applicationSummary(data: Data): Data {
+  return {
+    requesterId: data.requesterId, requesterName: data.requesterName,
+    requesterEmail: data.requesterEmail, orgName: data.orgName,
+    groupName: data.groupName, description: data.description,
+    revision: data.revision, status: data.status,
+    requestedAt: data.requestedAt?.toDate().toISOString() || null,
+    reviewedAt: data.reviewedAt?.toDate().toISOString() || null,
+    reviewReason: data.reviewReason || "",
+    subscriptionId: data.subscriptionId || null,
+  };
+}
+
+/** Applicants can read their own request without any tenant membership. */
+export const getMySubscriptionRequest = onCall(async (request) => {
+  const uid = caller(request);
+  fields(request.data, []);
+  const doc = await db.doc(`subscriptionRequests/${uid}`).get();
+  return {
+    application: doc.exists ? applicationSummary(doc.data() as Data) : null,
+  };
+});
+
+/** Paginated site review queue, including previous decisions. */
+export const listSubscriptionRequests = onCall(async (request) => {
+  await siteAdmin(request);
+  fields(request.data, ["status", "after"]);
+  const status = text(request.data.status, "status");
+  if (!["pending", "approved", "declined", "cancelled"].includes(status)) {
+    throw new HttpsError("invalid-argument", "Invalid request status.");
+  }
+  let query = db.collection("subscriptionRequests")
+    .where("status", "==", status)
+    .orderBy(FieldPath.documentId()).limit(26);
+  if (request.data.after !== undefined) {
+    query = query.startAfter(id(request.data.after, "after"));
+  }
+  const result = await query.get();
+  const rows = result.docs.slice(0, 25);
+  return {
+    applications: rows.map((doc) => applicationSummary(doc.data())),
+    nextCursor: result.size > 25 ? rows[24].id : null,
+  };
+});
+
+/** Approving is the only registration path that creates a subscription. */
+export const reviewSubscriptionRequest = onCall(async (request) => {
+  const reviewerId = await siteAdmin(request);
+  fields(request.data, ["requesterId", "revision", "decision", "reason"]);
+  const requesterId = id(request.data.requesterId, "requesterId");
+  const decision = text(request.data.decision, "decision");
+  const revision = request.data.revision;
+  if (!["approved", "declined"].includes(decision) ||
+      !Number.isSafeInteger(revision) || revision < 1) {
+    throw new HttpsError(
+      "invalid-argument", "Invalid review decision or revision."
+    );
+  }
+  const reason = decision === "declined" ?
+    text(request.data.reason, "decline reason", 2000) : "";
+  if (decision === "approved" && request.data.reason !== undefined) {
+    throw new HttpsError(
+      "invalid-argument", "Approval does not accept a reason."
+    );
+  }
+  const subRef = db.collection("subscriptions").doc();
+  const groupRef = db.collection("groups").doc();
+  const requestRef = db.doc(`subscriptionRequests/${requesterId}`);
+  return db.runTransaction(async (tx) => {
+    const application = await read(tx, requestRef.path);
+    const userRef = db.doc(`users/${requesterId}`);
+    const user = (await tx.get(userRef)).data();
+    if (application.status !== "pending" || application.revision !== revision) {
+      throw new HttpsError(
+        "failed-precondition", "This request has changed. Refresh the queue."
+      );
+    }
+    if (user?.subscriptionId) {
+      throw new HttpsError(
+        "failed-precondition", "The applicant already joined an organization."
+      );
+    }
+    const review: Data = {
+      status: decision, reviewedAt: now(), reviewedByUserId: reviewerId,
+      reviewReason: reason,
+    };
+    if (decision === "approved") {
+      tx.create(subRef, {
+        name: application.orgName, ownerUserId: requesterId, createdAt: now(),
+      });
+      tx.create(groupRef, {
+        subscriptionId: subRef.id, name: application.groupName,
+        description: "", createdAt: now(),
+      });
+      tx.set(userRef, {
+        ...user, name: user?.name || application.requesterName,
+        email: application.requesterEmail, avatarUrl: user?.avatarUrl || null,
+        subscriptionId: subRef.id, groups: {[groupRef.id]: "superadmin"},
+        sizes: user?.sizes || {}, createdAt: user?.createdAt || now(),
+      });
+      review.subscriptionId = subRef.id;
+    }
+    tx.update(requestRef, review);
+    tx.create(db.collection("siteAdminHistory").doc(), {
+      action: "review-subscription-request", requesterId, revision, decision,
+      application: {orgName: application.orgName,
+        groupName: application.groupName, description: application.description},
+      initiatedByUserId: reviewerId, reason, timestamp: now(),
+      ...(decision === "approved" ? {subscriptionId: subRef.id} : {}),
+    });
+    return {status: decision, subscriptionId: review.subscriptionId || null};
+  });
 });
 
 /** Invitation joining checks and sets membership atomically. */
@@ -244,6 +446,8 @@ export const joinSubscription = onCall(async (request) => {
   return db.runTransaction(async (tx) => {
     const userRef = db.doc(`users/${uid}`);
     const existing = (await tx.get(userRef)).data();
+    const applicationRef = db.doc(`subscriptionRequests/${uid}`);
+    const application = (await tx.get(applicationRef)).data();
     if (existing?.subscriptionId) {
       throw new HttpsError(
         "already-exists",
@@ -259,6 +463,10 @@ export const joinSubscription = onCall(async (request) => {
         "failed-precondition",
         "This organization cannot accept members."
       );
+    }
+    if (application?.status === "pending") {
+      tx.update(applicationRef, {status: "cancelled", reviewReason:
+        "Request closed because you joined an existing organization."});
     }
     tx.set(userRef, {
       subscriptionId,

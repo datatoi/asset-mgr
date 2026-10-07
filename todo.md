@@ -323,3 +323,29 @@ The mobile NFC project remains the separately planned Phase 6 work.
 - [x] Dedicated item detail/profile views and compact administration access.
 - [x] Mobile administration cards, full-screen editors, safe areas and invite link.
 - [x] Deploy the mobile web interface to `dressmanager-540ba` on 2 October 2026.
+
+## Site administration and explicit onboarding — October 2026
+
+- [x] Separate `/register` owner flow from default member sign-in; users without
+      membership see an invitation-required message on desktop and mobile.
+- [x] Organization administration hub with catalog/group/member links and invites.
+- [x] Restore a bounded site administration surface at `/site-admin`, as requested:
+      paginated subscription directory, group/member summaries, audited renaming.
+- [x] Provision/revoke site operators with a trusted custom-claim script; keep
+      existing tenant authorization intact and enforce live claim revocation.
+- [x] Deploy site administration callables/web and provision the initial operator
+      (`edgarsma@gmail.com`) on 7 October 2026.
+
+## Subscription registration approval — October 2026
+
+- [x] Main-page invitation message contains no subscription creation option.
+- [x] Explicit `/register` application with required explanation; pending requests
+      do not create tenants, groups or membership.
+- [x] Applicant status, decline feedback, revision/resubmission and approved entry UX.
+- [x] Site request queue with status filters, pagination, review, approval confirmation
+      and mandatory decline feedback, on desktop and mobile.
+- [x] Transactional approval, stale-revision checks, audit snapshots, and cancellation
+      when an applicant joins an existing organization.
+- [x] 64 emulator regression checks and 16 browser fixture checks pass.
+- [x] Deploy coordinated callable/web changes on 7 October 2026; confirmed
+      `www.atver.lv` serves the invitation-required entry and approval flow.
