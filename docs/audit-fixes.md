@@ -91,3 +91,17 @@ The production `getMySubscriptionRequest`, `listSubscriptionRequests` and
 Verified both `www.atver.lv` and the Firebase Hosting domain serve the new bundle
 with the invitation route/message, approval callables, and no old setup screen.
 These release checks do not simulate a fresh production Google sign-in.
+
+## Browser cache correction — 7 October 2026
+
+The deployed HTML was using Firebase Hosting's default `Cache-Control:
+max-age=3600`. A browser could reopen an older HTML document and its older app
+bundle, whose sign-in flow still navigated to registration. Refreshing loaded
+the corrected flow.
+
+Hosting now sends `Cache-Control: no-store` for app pages and rewrites, including
+`/`, `/login`, `/register`, and `/join/...`. Vite's hashed `/assets/**` files use
+`public, max-age=31536000, immutable`; their filenames change when content changes.
+Header rules match the requested URL before SPA rewrites, so the policy covers
+all routes. Existing tabs already executing an older bundle require one refresh;
+response headers cannot replace JavaScript already loaded in a browser.
