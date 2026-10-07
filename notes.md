@@ -23,3 +23,6 @@ firebase deploy --only hosting --project dressmanager-540ba
 # Everything at once
 npm --prefix web run build
 firebase deploy --project dressmanager-540ba
+
+
+ned this view switchable, like to swith weather to group by kits or show single ite mwiew, acrtually items 
