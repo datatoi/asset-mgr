@@ -1,5 +1,5 @@
 import Table from '../components/PresentationTable';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -16,6 +16,8 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKit, setEditingKit] = useState<Kit | null>(null);
   const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
 
 
 
@@ -44,7 +46,9 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   }, [userData]);
 
   const onFinish = async (values: Pick<Kit, 'name' | 'gender' | 'productIds' | 'description' | 'groupId'>) => {
-    if (!userData?.subscriptionId) return;
+    if (!userData?.subscriptionId || submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
       const { name, gender, productIds, description, groupId } = values;
       await saveCatalog('kits', { name, gender, productIds, description, groupId }, editingKit?.id);
@@ -52,6 +56,9 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       setIsModalOpen(false);
     } catch (err) {
       message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      submitting.current = false;
+      setSaving(false);
     }
   };
 
@@ -77,7 +84,7 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
         <Space>
           {canManage(userData, record.groupId, isOwner) ? (
             <>
-              <Button type="link" onClick={() => { setEditingKit(record); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
+              <Button type="link" onClick={() => { setEditingKit(record); form.resetFields(); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
               <Popconfirm title="Delete?" onConfirm={() => deleteCatalog('kits', record.id)}><Button type="link" danger>Delete</Button></Popconfirm>
             </>
           ) : null}
@@ -94,8 +101,8 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       </div>
       <Table mobile={mobile} dataSource={kits} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
-      <Modal className={mobile ? "mobile-editor" : undefined} title="Kit Definition" open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()}>
-        <Form form={form} layout="vertical" onFinish={onFinish}>
+      <Modal className={mobile ? "mobile-editor" : undefined} title="Kit Definition" open={isModalOpen} onCancel={() => { if (!submitting.current) setIsModalOpen(false); }} onOk={() => { if (!submitting.current) form.submit(); }} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }}>
+        <Form form={form} layout="vertical" onFinish={onFinish} disabled={saving}>
           <Form.Item name="name" label="Kit Name" rules={[{ required: true }]}><Input placeholder="e.g. Wedding Costume A" /></Form.Item>
           <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
             <Select><Select.Option value="male">Male</Select.Option><Select.Option value="female">Female</Select.Option></Select>

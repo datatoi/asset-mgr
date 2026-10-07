@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Alert, Avatar, Button, Drawer, Empty, Form, Input, message, Popconfirm, Select, Tabs, Tag } from 'antd';
 import { useAuth } from '../auth/AuthContext';
-import { canManage } from '../auth/permissions';
+import { canManage, canReceiveOffer } from '../auth/permissions';
 import { useTenantCollection } from '../hooks/useTenantCollection';
 import { call, saveCatalog } from '../lib/api';
 import type { Category, Product, UserProfile } from '../types/models';
@@ -11,7 +11,7 @@ import { useItemActivity } from './useItemActivity';
 
 export default function MobileItemDetail() {
   const { id } = useParams();
-  const { user, userData, isOwner } = useAuth();
+  const { user, userData, isOwner, subscriptionOwnerId } = useAuth();
   const activity = useItemActivity(id);
   const products = useTenantCollection<Product>('products');
   const categories = useTenantCollection<Category>('categories');
@@ -32,6 +32,7 @@ export default function MobileItemDetail() {
   const canOffer = groupMember && (isHolder || item?.ownerId === user?.uid);
   const name = (uid?: string | null) => !uid ? 'Unassigned' : uid === 'storage' ? 'Storage' : members.rows.find(m => m.id === uid)?.name || 'Member';
   const options = members.rows.map(m => ({ value: m.id, label: m.name || m.email || 'Member' }));
+  const recipientOptions = members.rows.filter(m => m.id !== user?.uid && !!item && canReceiveOffer(m, item.groupId, subscriptionOwnerId)).map(m => ({ value: m.id, label: m.name || m.email || 'Member' }));
   const perform = async (key: string, fn: () => Promise<unknown>, success: string) => {
     setBusy(key);
     try { await fn(); message.success(success); return true; }
@@ -63,7 +64,7 @@ export default function MobileItemDetail() {
         {isHolder ? <Popconfirm title="Return this item to storage?" onConfirm={() => perform('return', () => call('transferItem', { itemId: id, newHolderId: 'storage' }), 'Returned to storage')}><Button block type="primary" loading={busy === 'return'} disabled={!!busy}>Return to storage</Button></Popconfirm> : <Button block type="primary" loading={busy === 'request'} disabled={!!busy} onClick={() => perform('request', () => call('createTransfer', { itemId: id }), 'Request sent. Track it in Transfers.')}>{item.holderId === 'storage' ? 'Request from storage' : 'Request transfer'}</Button>}
       </div>}
       <Drawer title="Offer item to a member" placement="bottom" height="70svh" open={offer} onClose={() => setOffer(false)} className="mobile-overlay">
-        <div className="mobile-stack"><p>The recipient must accept before the item changes hands.</p><Select aria-label="Recipient" placeholder="Select recipient" showSearch optionFilterProp="label" options={options.filter(o => o.value !== user?.uid)} value={target} onChange={setTarget} /><Button type="primary" block disabled={!target || !!busy} loading={busy === 'offer'} onClick={async () => { if (await perform('offer', () => call('createTransfer', { itemId: id, targetUserId: target }), 'Offer sent')) setOffer(false); }}>Send offer</Button></div>
+        <div className="mobile-stack"><p>The recipient must accept before the item changes hands.</p><Select aria-label="Recipient" placeholder="Select recipient" showSearch optionFilterProp="label" options={recipientOptions} value={target} onChange={setTarget} /><Button type="primary" block disabled={!target || !!busy} loading={busy === 'offer'} onClick={async () => { if (await perform('offer', () => call('createTransfer', { itemId: id, targetUserId: target }), 'Offer sent')) setOffer(false); }}>Send offer</Button></div>
       </Drawer>
       <Drawer title="Owner and holder" placement="bottom" height="80svh" open={manage} onClose={() => setManage(false)} className="mobile-overlay">
         <Form layout="vertical">

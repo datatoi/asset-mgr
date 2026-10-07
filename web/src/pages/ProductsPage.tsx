@@ -1,5 +1,5 @@
 import Table from '../components/PresentationTable';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -17,6 +17,8 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
 
   const isAdmin = canManage(userData, undefined, isOwner);
   const managedGroups = groups.filter(g => canManage(userData, g.id, isOwner));
@@ -65,12 +67,15 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
   const handleEdit = (record: Product) => {
     setEditingProduct(record);
+    form.resetFields();
     form.setFieldsValue(record);
     setIsModalOpen(true);
   };
 
   const onFinish = async (values: Pick<Product, 'name' | 'categoryId' | 'groupId' | 'gender' | 'imageUrl'>) => {
-    if (!userData?.subscriptionId) return;
+    if (!userData?.subscriptionId || submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
       const { name, categoryId, groupId, gender, imageUrl } = values;
       await saveCatalog('products', { name, categoryId, groupId, gender, imageUrl }, editingProduct?.id);
@@ -78,6 +83,9 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       setIsModalOpen(false);
     } catch (err) {
       message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      submitting.current = false;
+      setSaving(false);
     }
   };
 
@@ -132,18 +140,18 @@ const ProductsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       <Modal className={mobile ? "mobile-editor" : undefined}
         title={editingProduct ? "Edit Product" : "Add Product"}
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        onOk={() => form.submit()}
+        onCancel={() => { if (!submitting.current) setIsModalOpen(false); }}
+        onOk={() => { if (!submitting.current) form.submit(); }} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }}
         width={600}
       >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Form form={form} layout="vertical" onFinish={onFinish} disabled={saving}>
           <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
             <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ categoryId: undefined, imageUrl: undefined })} disabled={!!editingProduct?.groupId}>
               {managedGroups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
             </Select>
           </Form.Item>
           <Form.Item name="imageUrl" label="Product Image">
-            <ImageUpload disabled={!selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/products`} />
+            <ImageUpload disabled={saving || !selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/products`} />
           </Form.Item>
           <Form.Item
             name="name"

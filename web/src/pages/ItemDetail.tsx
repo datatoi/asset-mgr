@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { doc, onSnapshot, collection, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { call, saveCatalog } from '../lib/api';
-import { canManage } from '../auth/permissions';
+import { canManage, canReceiveOffer } from '../auth/permissions';
 import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select, Space } from 'antd';
 import { useAuth } from '../auth/AuthContext';
 import type { Category, Product, HolderHistoryEntry, Item, ItemComment, UserProfile } from '../types/models';
@@ -12,7 +12,7 @@ const { Title, Text } = Typography;
 
 const ItemDetail: React.FC = () => {
   const { id } = useParams();
-  const { user, userData, isOwner } = useAuth();
+  const { user, userData, isOwner, subscriptionOwnerId } = useAuth();
   const [item, setItem] = useState<Item | null>(null);
   const [comments, setComments] = useState<ItemComment[]>([]);
   const [history, setHistory] = useState<HolderHistoryEntry[]>([]);
@@ -161,6 +161,7 @@ const ItemDetail: React.FC = () => {
               {isHolderOrOwner && (
                 <Space wrap>
                   <Select
+                    aria-label="Transfer recipient"
                     placeholder="Transfer to..."
                     style={{ width: 200, maxWidth: '100%' }}
                     value={transferTarget}
@@ -168,7 +169,7 @@ const ItemDetail: React.FC = () => {
                     showSearch
                     optionFilterProp="children"
                   >
-                    {members.filter(m => m.id !== user?.uid).map(m => (
+                    {members.filter(m => m.id !== user?.uid && canReceiveOffer(m, item.groupId, subscriptionOwnerId)).map(m => (
                       <Select.Option key={m.id} value={m.id}>{m.name}</Select.Option>
                     ))}
                   </Select>

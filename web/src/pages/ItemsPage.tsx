@@ -1,5 +1,5 @@
 import InventoryBrowser from '../components/InventoryBrowser';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Modal, Form, Input, Space, message, Popconfirm, Select } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -18,6 +18,8 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
 
   const isAdmin = canManage(userData, undefined, isOwner);
   const selectedGroup = Form.useWatch('groupId', form);
@@ -39,7 +41,9 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   }, [userData]);
 
   const onFinish = async (values: Pick<Item, 'productId' | 'groupId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl' | 'description'>) => {
-    if (!userData?.subscriptionId) return;
+    if (!userData?.subscriptionId || submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
       const { productId, groupId, size, gender, rfidTag, condition, imageUrl, description } = values;
       await saveCatalog('items', { productId, groupId, size, gender, rfidTag, condition, imageUrl, description }, editingItem?.id);
@@ -47,6 +51,9 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       setIsModalOpen(false);
     } catch (err) {
       message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      submitting.current = false;
+      setSaving(false);
     }
   };
 
@@ -59,15 +66,15 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       <InventoryBrowser cards={mobile} mobile={mobile} actions={record => (
         <Space wrap>
           <Button type="link" onClick={() => navigate(`/items/${record.id}`)}>View</Button>
-          <Button type="link" hidden={!canManage(userData, record.groupId, isOwner)} onClick={() => { setEditingItem(record); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
+          <Button type="link" hidden={!canManage(userData, record.groupId, isOwner)} onClick={() => { setEditingItem(record); form.resetFields(); form.setFieldsValue(record); setIsModalOpen(true); }}>Edit</Button>
           <Popconfirm title="Delete item?" onConfirm={() => deleteCatalog('items', record.id)}><Button type="link" danger hidden={!canManage(userData, record.groupId, isOwner)}>Delete</Button></Popconfirm>
         </Space>
       )} />
 
-      <Modal className={mobile ? "mobile-editor" : undefined} title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => setIsModalOpen(false)} onOk={() => form.submit()} width={700}>
-        <Form form={form} layout="vertical" onFinish={onFinish}>
+      <Modal className={mobile ? "mobile-editor" : undefined} title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => { if (!submitting.current) setIsModalOpen(false); }} onOk={() => { if (!submitting.current) form.submit(); }} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }} width={700}>
+        <Form form={form} layout="vertical" onFinish={onFinish} disabled={saving}>
           <Space align="start" size="large" wrap style={{ width: '100%' }}>
-            <Form.Item name="imageUrl" label="Item Image"><ImageUpload disabled={!selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/items`} /></Form.Item>
+            <Form.Item name="imageUrl" label="Item Image"><ImageUpload disabled={saving || !selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/items`} /></Form.Item>
             <div style={{ flex: '1 1 260px', minWidth: 0 }}>
               <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
                 <Select showSearch optionFilterProp="children">

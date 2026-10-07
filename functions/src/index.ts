@@ -793,7 +793,7 @@ export const createTransfer = onCall(async (request) => {
           "This person already holds the item."
         );
       }
-      await member(tx, targetUserId, group.subscriptionId);
+      await scope(tx, targetUserId, item.groupId);
     } else if (item.holderId === uid) {
       throw new HttpsError(
         "failed-precondition",

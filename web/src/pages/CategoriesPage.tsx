@@ -1,5 +1,5 @@
 import Table from '../components/PresentationTable';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Modal, Form, Input, Select, Space, message, Popconfirm, Tag } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -15,6 +15,8 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = Form.useForm();
+  const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
 
   const isAdmin = canManage(userData, undefined, isOwner);
 
@@ -47,6 +49,7 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
   const handleEdit = (record: Category) => {
     setEditingCategory(record);
+    form.resetFields();
     form.setFieldsValue(record);
     setIsModalOpen(true);
   };
@@ -54,7 +57,9 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const handleDelete = (id: string) => deleteCatalog('categories', id);
 
   const onFinish = async (values: Pick<Category, 'name' | 'groupId' | 'gender'>) => {
-    if (!userData?.subscriptionId) return;
+    if (!userData?.subscriptionId || submitting.current) return;
+    submitting.current = true;
+    setSaving(true);
     try {
       const { name, groupId, gender } = values;
       await saveCatalog('categories', { name, groupId, gender }, editingCategory?.id);
@@ -62,6 +67,9 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       setIsModalOpen(false);
     } catch (err) {
       message.error('Operation failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      submitting.current = false;
+      setSaving(false);
     }
   };
 
@@ -104,10 +112,10 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       <Modal className={mobile ? "mobile-editor" : undefined}
         title={editingCategory ? "Edit Category" : "Add Category"}
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        onOk={() => form.submit()}
+        onCancel={() => { if (!submitting.current) setIsModalOpen(false); }}
+        onOk={() => { if (!submitting.current) form.submit(); }} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }}
       >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
+        <Form form={form} layout="vertical" onFinish={onFinish} disabled={saving}>
           <Form.Item
             name="name"
             label="Category Name"

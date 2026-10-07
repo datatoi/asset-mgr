@@ -339,6 +339,46 @@ async function client(name, signedIn = true) {
     await denied(() => call('transferItem', owner.uid, { itemId: x, transferId: 'legacy' }), 'failed-precondition');
     await call('declineTransfer', owner.uid, { transferId: 'legacy' });
   });
+  await test('Offers reject joiners and recipients outside the item group', async () => {
+    const x = await newItem();
+    await call('transferItem', owner.uid, { itemId: x, newHolderId: user.uid });
+    for (const [uid, groups] of [['offer-joiner', { [G]: 'joiner' }], ['offer-other-group', { unmanaged: 'user' }]]) {
+      await db.doc(`users/${uid}`).set({ subscriptionId: A, groups });
+      await denied(() => call('createTransfer', user.uid, { itemId: x, targetUserId: uid }));
+    }
+    assert.equal((await db.collection('transfers').where('itemId', '==', x).get()).size, 0);
+  });
+  await test('Subscription owner can receive an offer without a group role', async () => {
+    const x = await newItem();
+    await call('transferItem', owner.uid, { itemId: x, newHolderId: user.uid });
+    const previous = (await db.doc(`users/${owner.uid}`).get()).data().groups;
+    await db.doc(`users/${owner.uid}`).update({ groups: {} });
+    try {
+      const offer = await call('createTransfer', user.uid, { itemId: x, targetUserId: owner.uid });
+      await call('transferItem', owner.uid, { itemId: x, transferId: offer.transferId });
+      assert.equal((await db.doc(`items/${x}`).get()).data().holderId, owner.uid);
+    } finally { await db.doc(`users/${owner.uid}`).update({ groups: previous }); }
+  });
+  await test('Recipient role revocation prevents accepting an existing offer', async () => {
+    const x = await newItem();
+    await call('transferItem', owner.uid, { itemId: x, newHolderId: user.uid });
+    const offer = await call('createTransfer', user.uid, { itemId: x, targetUserId: other.uid });
+    await db.doc(`users/${other.uid}`).update({ [`groups.${G}`]: 'joiner' });
+    try {
+      await denied(() => call('transferItem', other.uid, { itemId: x, transferId: offer.transferId }));
+      assert.equal((await db.doc(`items/${x}`).get()).data().holderId, user.uid);
+      await call('declineTransfer', user.uid, { transferId: offer.transferId });
+    } finally { await db.doc(`users/${other.uid}`).update({ [`groups.${G}`]: 'user' }); }
+  });
+  await test('Owner repairs a groupless kit and restores checkout', async () => {
+    await newItem();
+    await db.doc('kits/legacy-kit').set({ subscriptionId: A, name: 'Legacy kit', gender: 'male', productIds: [product.id] });
+    await denied(() => call('requestKit', user.uid, { kitId: 'legacy-kit' }), 'invalid-argument');
+    await denied(() => call('saveCatalog', manager.uid, { collection: 'kits', id: 'legacy-kit', values: { groupId: G } }));
+    await call('saveCatalog', owner.uid, { collection: 'kits', id: 'legacy-kit', values: { groupId: G } });
+    const requested = await call('requestKit', user.uid, { kitId: 'legacy-kit' });
+    assert.equal(requested.transferIds.length, 1);
+  });
   await test('Owner can repair records without a legacy group ID', async () => {
     await db.doc('categories/legacy').set({ subscriptionId: A, name: 'Legacy', gender: 'unisex' });
     await call('saveCatalog', owner.uid, { collection: 'categories', id: 'legacy', values: { groupId: G } });
