@@ -41,7 +41,8 @@ export default function MobileItemDetail() {
   };
   return <MobileLoadState loading={activity.loading || products.loading || members.loading} error={activity.error || products.error || members.error || categories.error} empty={!item}>
     {item && <section className="mobile-stack mobile-with-actions">
-      <GarmentImage src={item.imageUrl || product?.imageUrl} name={product?.name || 'Garment'} large />
+      <GarmentImage src={product?.imageUrl || item.imageUrl} name={product?.name || 'Garment'} large />
+      {product?.imageUrl && item.imageUrl && <div className="mobile-card mobile-stack"><h3>Item photo</h3><GarmentImage src={item.imageUrl} name={`${product.name} item photo`} large /></div>}
       <div className="mobile-card mobile-stack"><h2>{product?.name || 'Garment'}</h2><div className="mobile-tags"><Tag>{item.size || 'No size'}</Tag><Tag>{item.gender}</Tag><Tag color={item.condition === 'damaged' ? 'red' : 'default'}>{item.condition}</Tag></div><p>{item.description || 'No description provided.'}</p>
         <dl className="mobile-properties"><dt>Category</dt><dd>{category?.name || 'Unknown'}</dd><dt>Holder</dt><dd>{name(item.holderId)}</dd><dt>Owner</dt><dd>{name(item.ownerId)}</dd><dt>NFC tag</dt><dd>{item.rfidTag || 'Not assigned'}</dd></dl>
         {canOffer && <Button block disabled={!!busy} onClick={() => { setTarget(undefined); setOffer(true); }}>Offer to another member</Button>}

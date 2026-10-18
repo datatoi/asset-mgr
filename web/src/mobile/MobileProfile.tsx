@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Collapse, Form, Input, message, Select } from 'antd';
+import SizeInput from '../components/SizeInput';
 import { useAuth } from '../auth/AuthContext';
 import { useTenantCollection } from '../hooks/useTenantCollection';
 import { call } from '../lib/api';
@@ -38,7 +39,7 @@ export default function MobileProfile() {
       <section className="mobile-card mobile-stack"><h2>Sizes by category</h2><p className="mobile-muted">Set a separate size for shoes, dresses and other garment categories.</p>
         {!gender && <p className="mobile-muted">Choose your gender to see all matching categories.</p>}
         {!visible.length && <p className="mobile-muted">No matching categories yet.</p>}
-        <Collapse ghost defaultActiveKey={['sizes']} items={[{ key: 'sizes', label: `${visible.length} category sizes`, forceRender: true, children: visible.map(c => <Form.Item key={c.id} label={c.name} name={['sizes', c.id]} rules={[{ max: 50 }]}><Input placeholder="e.g. M or 42" maxLength={50} /></Form.Item>) }]} />
+        <Collapse ghost defaultActiveKey={['sizes']} items={[{ key: 'sizes', label: `${visible.length} category sizes`, forceRender: true, children: visible.map(c => <Form.Item key={c.id} label={c.name} name={['sizes', c.id]} rules={[{ max: 50 }]}><SizeInput sizes={c.sizes} placeholder="e.g. M or 42" /></Form.Item>) }]} />
       </section>
       <div className="mobile-fixed-action"><Button type="primary" block htmlType="submit" loading={saving}>Save profile</Button></div>
     </Form>

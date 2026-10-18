@@ -4,7 +4,7 @@ import { doc, onSnapshot, collection, query, orderBy, where } from 'firebase/fir
 import { db } from '../lib/firebase';
 import { call, saveCatalog } from '../lib/api';
 import { canManage, canReceiveOffer } from '../auth/permissions';
-import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select, Space } from 'antd';
+import { Tabs, Descriptions, Tag, List, Input, Button, Avatar, Typography, Card, Table, Row, Col, message, Select, Space, Image } from 'antd';
 import { useAuth } from '../auth/AuthContext';
 import type { Category, Product, HolderHistoryEntry, Item, ItemComment, UserProfile } from '../types/models';
 
@@ -141,7 +141,13 @@ const ItemDetail: React.FC = () => {
       <Card>
         <Row gutter={24}>
           <Col md={8}>
-            <img src={item.imageUrl || product?.imageUrl} alt="item" style={{ width: '100%', borderRadius: 8 }} />
+            <Image.PreviewGroup>
+              {(product?.imageUrl || item.imageUrl) && <Image src={product?.imageUrl || item.imageUrl} alt={product?.name || 'item'} width="100%" style={{ borderRadius: 8 }} />}
+              {product?.imageUrl && item.imageUrl && <div style={{ marginTop: 12 }}>
+                <Typography.Text type="secondary">Item photo</Typography.Text>
+                <Image src={item.imageUrl} alt="Item photo" width="100%" style={{ borderRadius: 8, marginTop: 4 }} />
+              </div>}
+            </Image.PreviewGroup>
           </Col>
           <Col md={16}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>

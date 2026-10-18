@@ -600,7 +600,7 @@ export const saveCatalog = onCall(async (request) => {
   }
   const values = object(request.data.values);
   const allowed: Record<string, string[]> = {
-    categories: ["groupId", "name", "gender"],
+    categories: ["groupId", "name", "gender", "sizes"],
     products: ["groupId", "categoryId", "name", "gender", "imageUrl"],
     items: [
       "groupId",
@@ -642,6 +642,14 @@ export const saveCatalog = onCall(async (request) => {
       throw new HttpsError("invalid-argument", "Invalid gender.");
     }
     cleaned.gender = data.gender;
+    if (collection === "categories" && data.sizes !== undefined) {
+      if (!Array.isArray(data.sizes) || data.sizes.length > 100) {
+        throw new HttpsError("invalid-argument", "Use up to 100 sizes.");
+      }
+      cleaned.sizes = [...new Set(
+        data.sizes.map((s: unknown) => text(s, "size", 50))
+      )];
+    }
     if (collection === "products") {
       cleaned.categoryId = id(data.categoryId, "categoryId");
       sameScope(

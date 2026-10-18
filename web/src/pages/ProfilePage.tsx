@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Form, Input, Button, Card, Typography, Select, message, Space } from 'antd';
+import SizeInput from '../components/SizeInput';
 import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { call } from '../lib/api';
@@ -104,7 +105,7 @@ const ProfilePage: React.FC = () => {
                 name={['sizes', category.id]}
                 style={{ marginBottom: 8 }}
               >
-                <Input placeholder="e.g. M, 42" style={{ width: 200 }} />
+                <SizeInput sizes={category.sizes} placeholder="e.g. M, 42" style={{ width: 200 }} />
               </Form.Item>
             ))}
           </Space>

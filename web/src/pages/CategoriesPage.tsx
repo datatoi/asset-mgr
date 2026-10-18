@@ -56,13 +56,13 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
   const handleDelete = (id: string) => deleteCatalog('categories', id);
 
-  const onFinish = async (values: Pick<Category, 'name' | 'groupId' | 'gender'>) => {
+  const onFinish = async (values: Pick<Category, 'name' | 'groupId' | 'gender' | 'sizes'>) => {
     if (!userData?.subscriptionId || submitting.current) return;
     submitting.current = true;
     setSaving(true);
     try {
-      const { name, groupId, gender } = values;
-      await saveCatalog('categories', { name, groupId, gender }, editingCategory?.id);
+      const { name, groupId, gender, sizes } = values;
+      await saveCatalog('categories', { name, groupId, gender, sizes: sizes ?? [] }, editingCategory?.id);
       message.success(editingCategory ? 'Updated successfully' : 'Created successfully');
       setIsModalOpen(false);
     } catch (err) {
@@ -86,6 +86,12 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       dataIndex: 'gender',
       key: 'gender',
       render: (g: string) => <Tag color={g === 'male' ? 'blue' : g === 'female' ? 'magenta' : 'default'}>{g?.toUpperCase()}</Tag>
+    },
+    {
+      title: 'Sizes',
+      dataIndex: 'sizes',
+      key: 'sizes',
+      render: (sizes?: string[]) => sizes?.length ? <Space size={[0, 4]} wrap>{sizes.map(s => <Tag key={s}>{s}</Tag>)}</Space> : '—'
     },
     {
       title: 'Action',
@@ -134,6 +140,9 @@ const CategoriesPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
               <Select.Option value="female">Female</Select.Option>
               <Select.Option value="unisex">Unisex</Select.Option>
             </Select>
+          </Form.Item>
+          <Form.Item name="sizes" label="Size Template" extra="Sizes suggested when adding items and on member profiles. Any other size can still be typed there. Press Enter or comma after each size.">
+            <Select mode="tags" tokenSeparators={[',']} open={false} placeholder="e.g. XS, S, M, L, XL" />
           </Form.Item>
         </Form>
       </Modal>

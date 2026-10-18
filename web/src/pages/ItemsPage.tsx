@@ -1,20 +1,22 @@
 import InventoryBrowser from '../components/InventoryBrowser';
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Modal, Form, Input, Space, message, Popconfirm, Select } from 'antd';
+import { Button, Modal, Form, Input, Space, message, Popconfirm, Select, Typography } from 'antd';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { saveCatalog, deleteCatalog } from '../lib/api';
 import { canManage } from '../auth/permissions';
 import { useAuth } from '../auth/AuthContext';
 import ImageUpload from '../components/ImageUpload';
-import type { Group, Item, Product } from '../types/models';
+import SizeInput from '../components/SizeInput';
+import type { Category, Group, Item, Product } from '../types/models';
 
 const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const { userData, isOwner } = useAuth();
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [form] = Form.useForm();
@@ -24,6 +26,9 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
   const isAdmin = canManage(userData, undefined, isOwner);
   const selectedGroup = Form.useWatch('groupId', form);
   const managedGroups = groups.filter(g => canManage(userData, g.id, isOwner));
+  const selectedProductId = Form.useWatch('productId', form);
+  const selectedProduct = products.find(p => p.id === selectedProductId);
+  const itemImage = Form.useWatch('imageUrl', form);
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
@@ -38,7 +43,12 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       setGroups(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group)));
     });
 
-    return () => { unsubProducts(); unsubGroups(); };
+    const qCategories = query(collection(db, 'categories'), where('subscriptionId', '==', userData.subscriptionId));
+    const unsubCategories = onSnapshot(qCategories, (snapshot) => {
+      setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
+    });
+
+    return () => { unsubProducts(); unsubGroups(); unsubCategories(); };
   }, [userData]);
 
   const onFinish = async (values: Pick<Item, 'productId' | 'groupId' | 'size' | 'gender' | 'rfidTag' | 'condition' | 'imageUrl' | 'description'>) => {
@@ -75,7 +85,17 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       <Modal className={mobile ? "mobile-editor" : undefined} title={editingItem ? "Edit Item" : "Add Item"} open={isModalOpen} onCancel={() => { if (!submitting.current) setIsModalOpen(false); }} onOk={() => { if (!submitting.current) form.submit(); }} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }} width={700}>
         <Form form={form} layout="vertical" onFinish={onFinish} disabled={saving}>
           <Space align="start" size="large" wrap style={{ width: '100%' }}>
-            <Form.Item name="imageUrl" label="Item Image"><ImageUpload disabled={saving || !selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/items`} /></Form.Item>
+            <div>
+              <Form.Item label="Product Image">
+                {selectedProduct?.imageUrl
+                  ? <img src={selectedProduct.imageUrl} alt={selectedProduct.name} style={{ width: 102, height: 102, objectFit: 'cover', borderRadius: 8 }} />
+                  : <Typography.Text type="secondary">{selectedProduct ? 'No product image' : 'Select a product'}</Typography.Text>}
+              </Form.Item>
+              <Form.Item name="imageUrl" label="Additional Item Image" extra="Optional photo of this specific garment" style={{ marginBottom: 4 }}>
+                <ImageUpload disabled={saving || !selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/items`} />
+              </Form.Item>
+              {itemImage && <Button size="small" type="link" danger disabled={saving} onClick={() => form.setFieldsValue({ imageUrl: '' })}>Remove item image</Button>}
+            </div>
             <div style={{ flex: '1 1 260px', minWidth: 0 }}>
               <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
                 <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ productId: undefined, imageUrl: undefined })} disabled={!!editingItem?.groupId}>
@@ -84,10 +104,11 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
               </Form.Item>
               <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
                 <Select showSearch optionFilterProp="label" disabled={!selectedGroup} placeholder={selectedGroup ? 'Select Product' : 'Select a group first'} notFoundContent="No products in this group. Add a product first."
+                  onChange={(id: string) => { const gender = products.find(p => p.id === id)?.gender; if (gender) form.setFieldsValue({ gender }); }}
                   options={products.filter(p => p.groupId === selectedGroup).map(p => ({ value: p.id, label: `${p.name} (${p.gender})` }))} />
               </Form.Item>
               <Space wrap>
-                <Form.Item name="size" label="Size" rules={[{ required: true }]}><Input placeholder="e.g. M, 42, 175cm" /></Form.Item>
+                <Form.Item name="size" label="Size" rules={[{ required: true }]}><SizeInput sizes={categories.find(c => c.id === selectedProduct?.categoryId)?.sizes} style={{ width: 200 }} /></Form.Item>
                 <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
                   <Select style={{ width: 120 }}>
                     <Select.Option value="male">Male</Select.Option>

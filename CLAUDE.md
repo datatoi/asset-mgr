@@ -116,7 +116,9 @@ Catalog hierarchy: **Category → Product → Item**, plus **Kit** (outfit defin
   for (a user only sees `unisex` categories plus ones matching their own
   gender). Unlike Product/Item, a *user's own* `gender` only ever offers
   `male`/`female` on Profile — "unisex" describes a garment that fits
-  either, not a person
+  either, not a person. Optional `sizes` (string array, ≤100 entries of ≤50
+  chars) is a size *template*: item and profile size fields suggest it via
+  `SizeInput` but still accept any free-text size
 - `products/{productId}` — `subscriptionId`, `groupId`, `categoryId`, `name`,
   `gender`, `imageUrl`  (e.g. "red dress")
 - `items/{itemId}` — `subscriptionId`, `groupId`, `productId`, `size`, `gender`,

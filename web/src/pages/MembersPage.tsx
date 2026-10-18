@@ -1,6 +1,7 @@
 import Table from '../components/PresentationTable';
 import React, { useEffect, useState } from 'react';
 import { Space, Card, Typography, message, Select, Button, Modal, Form, Input, Popconfirm } from 'antd';
+import SizeInput from '../components/SizeInput';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { call } from '../lib/api';
@@ -67,7 +68,7 @@ const MembersPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
       <Form form={form} layout="vertical" onFinish={save}>
         <Form.Item name="name" label="Name" rules={[{ required: true }]}><Input maxLength={200} /></Form.Item>
         <Form.Item name="gender" label="Gender"><Select options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]} /></Form.Item>
-        {categories.map(c => <Form.Item key={c.id} name={['sizes', c.id]} label={`${c.name} size`}><Input maxLength={50} /></Form.Item>)}
+        {categories.map(c => <Form.Item key={c.id} name={['sizes', c.id]} label={`${c.name} size`}><SizeInput sizes={c.sizes} /></Form.Item>)}
       </Form>
     </Modal>
   </Card></div>;

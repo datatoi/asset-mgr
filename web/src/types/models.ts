@@ -57,6 +57,8 @@ export interface Category {
   // when picking a size on Profile; 'male'/'female' categories only show for
   // users of that gender.
   gender: Gender
+  // Size template suggested for items and profiles; any other size may still be typed.
+  sizes?: string[]
 }
 
 export interface Product {
