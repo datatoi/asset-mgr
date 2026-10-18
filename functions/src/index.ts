@@ -638,7 +638,11 @@ export const saveCatalog = onCall(async (request) => {
     }
     const cleaned: Data = {subscriptionId, groupId};
     if (collection !== "items") cleaned.name = text(data.name, "name");
-    if (!["male", "female", "unisex"].includes(data.gender)) {
+    // Kits are outfit definitions for one gender; garments may be unisex.
+    const genders = collection === "kits" ?
+      ["male", "female"] :
+      ["male", "female", "unisex"];
+    if (!genders.includes(data.gender)) {
       throw new HttpsError("invalid-argument", "Invalid gender.");
     }
     cleaned.gender = data.gender;

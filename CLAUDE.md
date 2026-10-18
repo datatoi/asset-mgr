@@ -126,7 +126,8 @@ Catalog hierarchy: **Category → Product → Item**, plus **Kit** (outfit defin
   - subcollection `comments/{id}` — `userId`, `text`, `timestamp`
   - subcollection `holderHistory/{id}` — `previousHolderId`, `newHolderId`,
     `transferDate`, `initiatedByUserId`, `transferType` (`request` | `admin` | `scan` | `return`)
-- `kits/{kitId}` — `subscriptionId`, `groupId`, `name`, `gender`,
+- `kits/{kitId}` — `subscriptionId`, `groupId`, `name`, `gender`
+  (`'male'|'female'` only — kits are never unisex, though their items may be),
   `productIds` (the specific Products a complete kit requires — one of each —
   not Categories; e.g. "Red Dress" + "Black Shoes", not "Dress" + "Shoes"),
   `description` — no flat `size` field; fulfillment matches per-category

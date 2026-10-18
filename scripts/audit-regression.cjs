@@ -216,6 +216,7 @@ async function client(name, signedIn = true) {
     const records = await Promise.all([db.doc(`transfers/${a.transferIds[0]}`).get(), db.doc(`transfers/${b.transferIds[0]}`).get()]);
     assert.deepEqual(records.map(r => r.data().status).sort(), ['declined', 'transferred']);
   });
+  await test('Unisex kit definitions are rejected', () => denied(() => call('saveCatalog', owner.uid, { collection: 'kits', values: { groupId: G, name: 'Unisex kit', gender: 'unisex', productIds: [product.id] } }), 'invalid-argument'));
   await test('Foreign kit request denied', () => denied(() => call('requestKit', foreign.uid, { kitId: kit1.id })));
   await test('Foreign and invalid role assignments rejected', async () => {
     await denied(() => call('assignRole', owner.uid, { targetUid: foreign.uid, groupId: G, role: 'superadmin' }));
