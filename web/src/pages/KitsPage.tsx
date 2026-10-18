@@ -23,6 +23,7 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
   const isAdmin = canManage(userData, undefined, isOwner);
   const selectedGroup = Form.useWatch('groupId', form);
+  const managedGroups = groups.filter(g => canManage(userData, g.id, isOwner));
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
@@ -97,27 +98,27 @@ const KitsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2>Costume Kits (Sets)</h2>
-        {isAdmin && <Button type="primary" onClick={() => { setEditingKit(null); form.resetFields(); setIsModalOpen(true); }}>Define Kit</Button>}
+        {isAdmin && <Button type="primary" onClick={() => { setEditingKit(null); form.resetFields(); if (managedGroups.length === 1) form.setFieldsValue({ groupId: managedGroups[0].id }); setIsModalOpen(true); }}>Define Kit</Button>}
       </div>
       <Table mobile={mobile} dataSource={kits} columns={columns} rowKey="id" scroll={{ x: 'max-content' }} />
 
       <Modal className={mobile ? "mobile-editor" : undefined} title="Kit Definition" open={isModalOpen} onCancel={() => { if (!submitting.current) setIsModalOpen(false); }} onOk={() => { if (!submitting.current) form.submit(); }} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} mask={{ closable: !saving }}>
         <Form form={form} layout="vertical" onFinish={onFinish} disabled={saving}>
+          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+            <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ productIds: undefined })} disabled={!!editingKit?.groupId}>
+              {managedGroups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
+            </Select>
+          </Form.Item>
           <Form.Item name="name" label="Kit Name" rules={[{ required: true }]}><Input placeholder="e.g. Wedding Costume A" /></Form.Item>
           <Form.Item name="gender" label="Gender" rules={[{ required: true }]}>
             <Select><Select.Option value="male">Male</Select.Option><Select.Option value="female">Female</Select.Option></Select>
           </Form.Item>
           <Form.Item name="productIds" label="Required Products" rules={[{ required: true }]}>
-            <Select mode="multiple" placeholder="Select what makes this kit complete">
+            <Select mode="multiple" disabled={!selectedGroup} placeholder={selectedGroup ? 'Select what makes this kit complete' : 'Select a group first'} notFoundContent="No products in this group. Add a product first.">
               {products.filter(p => p.groupId === selectedGroup).map(p => <Select.Option key={p.id} value={p.id}>{p.name}</Select.Option>)}
             </Select>
           </Form.Item>
           <Form.Item name="description" label="Description"><Input.TextArea /></Form.Item>
-          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
-            <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ productIds: undefined })} disabled={!!editingKit?.groupId}>
-              {groups.filter(g => canManage(userData, g.id, isOwner)).map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
-            </Select>
-          </Form.Item>
         </Form>
       </Modal>
     </div>

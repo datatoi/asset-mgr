@@ -23,6 +23,7 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
   const isAdmin = canManage(userData, undefined, isOwner);
   const selectedGroup = Form.useWatch('groupId', form);
+  const managedGroups = groups.filter(g => canManage(userData, g.id, isOwner));
 
   useEffect(() => {
     if (!userData?.subscriptionId) return;
@@ -61,7 +62,7 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2>Physical Items (Inventory)</h2>
-        <Button type="primary" hidden={!isAdmin} onClick={() => { setEditingItem(null); form.resetFields(); setIsModalOpen(true); }}>Add Item</Button>
+        <Button type="primary" hidden={!isAdmin} onClick={() => { setEditingItem(null); form.resetFields(); if (managedGroups.length === 1) form.setFieldsValue({ groupId: managedGroups[0].id }); setIsModalOpen(true); }}>Add Item</Button>
       </div>
       <InventoryBrowser cards={mobile} mobile={mobile} actions={record => (
         <Space wrap>
@@ -76,10 +77,14 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
           <Space align="start" size="large" wrap style={{ width: '100%' }}>
             <Form.Item name="imageUrl" label="Item Image"><ImageUpload disabled={saving || !selectedGroup} folder={`subscriptions/${userData?.subscriptionId}/groups/${selectedGroup}/items`} /></Form.Item>
             <div style={{ flex: '1 1 260px', minWidth: 0 }}>
-              <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
-                <Select showSearch optionFilterProp="children">
-                  {products.filter(p => p.groupId === selectedGroup).map(p => <Select.Option key={p.id} value={p.id}>{p.name} ({p.gender})</Select.Option>)}
+              <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+                <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ productId: undefined, imageUrl: undefined })} disabled={!!editingItem?.groupId}>
+                  {managedGroups.map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
                 </Select>
+              </Form.Item>
+              <Form.Item name="productId" label="Product" rules={[{ required: true }]}>
+                <Select showSearch optionFilterProp="label" disabled={!selectedGroup} placeholder={selectedGroup ? 'Select Product' : 'Select a group first'} notFoundContent="No products in this group. Add a product first."
+                  options={products.filter(p => p.groupId === selectedGroup).map(p => ({ value: p.id, label: `${p.name} (${p.gender})` }))} />
               </Form.Item>
               <Space wrap>
                 <Form.Item name="size" label="Size" rules={[{ required: true }]}><Input placeholder="e.g. M, 42, 175cm" /></Form.Item>
@@ -94,11 +99,6 @@ const ItemsPage: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
               <Form.Item name="rfidTag" label="NFC / RFID Tag ID"><Input placeholder="Scan or type Tag UID" /></Form.Item>
               <Form.Item name="condition" label="Condition"><Select><Select.Option value="new">New</Select.Option><Select.Option value="good">Good</Select.Option><Select.Option value="worn">Worn</Select.Option><Select.Option value="damaged">Damaged</Select.Option></Select></Form.Item>
               <Form.Item name="description" label="Description"><Input.TextArea rows={2} placeholder="Notes about this specific item" /></Form.Item>
-              <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
-                <Select placeholder="Select Group" onChange={() => form.setFieldsValue({ productId: undefined, imageUrl: undefined })} disabled={!!editingItem?.groupId}>
-                  {groups.filter(g => canManage(userData, g.id, isOwner)).map(g => <Select.Option key={g.id} value={g.id}>{g.name}</Select.Option>)}
-                </Select>
-              </Form.Item>
             </div>
           </Space>
         </Form>
