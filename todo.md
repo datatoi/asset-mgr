@@ -334,7 +334,7 @@ The mobile NFC project remains the separately planned Phase 6 work.
 - [x] Provision/revoke site operators with a trusted custom-claim script; keep
       existing tenant authorization intact and enforce live claim revocation.
 - [x] Deploy site administration callables/web and provision the initial operator
-      (`edgarsma@gmail.com`) on 7 October 2026.
+      on 7 October 2026.
 
 ## Subscription registration approval — October 2026
 

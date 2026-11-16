@@ -70,3 +70,13 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Local / personal files
+.DS_Store
+.claude/settings.json
+.claude/settings.local.json
+notes.md
+
+# Locally installed AI agent skills (reinstall with your agent tooling)
+.agents/
+skills-lock.json

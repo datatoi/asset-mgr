@@ -20,7 +20,7 @@ The user subsequently requested fixes for all five findings:
   verifying every required product belongs to that group and subscription. The
   update used the document's previous update time as a precondition. A readback
   verified only `groupId` changed. Backup:
-  `/Users/edgars/.codex/backups/asset-mgr/20261007T062521Z/kit-before-group-repair.json`.
+  kept outside the repository.
 - Four new emulator checks cover ineligible recipients, owner acceptance without
   a group role, role revocation, and legacy-kit repair followed by checkout.
   The expanded suite passes **68 checks with 0 failures**.
